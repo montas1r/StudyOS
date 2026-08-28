@@ -1,0 +1,214 @@
+/* ══════════════════════════════════════════════
+   UTILITIES — @utility definitions for brutalist
+   design system tokens and repeated patterns
+   ══════════════════════════════════════════════ */
+
+/* ─── Font Families ─── */
+@utility b-font-mono {
+  font-family: "JetBrains Mono", monospace;
+}
+@utility b-font-sans {
+  font-family: "Inter", sans-serif;
+}
+@utility b-font-serif {
+  font-family: "Fraunces", serif;
+}
+
+/* ─── Numeric ─── */
+@utility b-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Border Radius (brutalist = square) ─── */
+@utility b-square {
+  border-radius: 0;
+}
+
+/* ─── Colors — Text ─── */
+@utility b-text-bright {
+  color: #edebe2;
+}
+@utility b-text-dim {
+  color: #9498b0;
+}
+@utility b-text-muted {
+  color: #5a5e78;
+}
+@utility b-text-faint {
+  color: #3a3f58;
+}
+@utility b-text-dim-2 {
+  color: #52525b;
+}
+@utility b-text-zinc {
+  color: #d4d4d8;
+}
+@utility b-text-white {
+  color: #fafafa;
+}
+
+/* ─── Colors — Accent ─── */
+@utility b-amber {
+  color: #e8a33d;
+}
+@utility b-green {
+  color: #6fbf8b;
+}
+@utility b-red {
+  color: #e1614b;
+}
+@utility b-amber-bright {
+  color: #f59e0b;
+}
+
+/* ─── Colors — Backgrounds ─── */
+@utility b-bg-surface {
+  background: #12141f;
+}
+@utility b-bg-base {
+  background: #0d0f18;
+}
+@utility b-bg-card {
+  background: #18181b;
+}
+@utility b-bg-deep {
+  background: #0f1120;
+}
+@utility b-bg-panel {
+  background: #161828;
+}
+@utility b-bg-grid {
+  background: #1a1d2e;
+}
+@utility b-bg-row {
+  background: #141416;
+}
+@utility b-bg-amber {
+  background: #e8a33d;
+}
+@utility b-bg-amber-subtle {
+  background: rgba(232, 163, 61, 0.06);
+}
+@utility b-bg-amber-ghost {
+  background: rgba(232, 163, 61, 0.08);
+}
+@utility b-bg-amber-wash {
+  background: rgba(232, 163, 61, 0.04);
+}
+@utility b-bg-red-subtle {
+  background: rgba(225, 97, 75, 0.04);
+}
+@utility b-bg-red-ghost {
+  background: rgba(225, 97, 75, 0.08);
+}
+@utility b-bg-green-ghost {
+  background: rgba(111, 191, 139, 0.08);
+}
+
+/* ─── Borders ─── */
+@utility b-border {
+  border: 1px solid #1e2133;
+}
+@utility b-border-b {
+  border-bottom: 1px solid #1e2133;
+}
+@utility b-border-t {
+  border-top: 1px solid #1e2133;
+}
+@utility b-border-r {
+  border-right: 1px solid #1e2133;
+}
+@utility b-border-strong {
+  border: 1px solid #2a2e42;
+}
+@utility b-border-amber {
+  border: 1px solid #e8a33d;
+}
+@utility b-border-red {
+  border: 1px solid #e1614b40;
+}
+@utility b-border-dashed {
+  border: 1px dashed #1e2133;
+}
+@utility b-border-dashed-amber {
+  border: 1px dashed #e8a33d;
+}
+
+/* ─── Letter Spacing ─── */
+@utility b-tracking-wide {
+  letter-spacing: 2px;
+}
+@utility b-tracking-medium {
+  letter-spacing: 1.5px;
+}
+@utility b-tracking-normal {
+  letter-spacing: 1px;
+}
+@utility b-tracking-tight {
+  letter-spacing: 0.5px;
+}
+@utility b-tracking-micro {
+  letter-spacing: 0.3px;
+}
+
+/* ─── Font Sizes (brutalist scale) ─── */
+@utility b-text-xs {
+  font-size: 9px;
+}
+@utility b-text-sm {
+  font-size: 10px;
+}
+@utility b-text-base {
+  font-size: 11px;
+}
+@utility b-text-md {
+  font-size: 12px;
+}
+@utility b-text-lg {
+  font-size: 13px;
+}
+@utility b-text-xl {
+  font-size: 14px;
+}
+
+/* ─── Transitions ─── */
+@utility b-transition {
+  transition: all 0.12s ease;
+}
+@utility b-transition-fast {
+  transition: all 0.12s ease;
+}
+@utility b-transition-colors {
+  transition: color 0.12s ease;
+}
+@utility b-transition-bg {
+  transition: background 0.12s ease;
+}
+@utility b-transition-width {
+  transition: width 0.3s ease;
+}
+@utility b-transition-height {
+  transition: height 0.3s ease;
+}
+
+/* ─── Cursor ─── */
+@utility b-cursor-pointer {
+  cursor: pointer;
+}
+@utility b-cursor-grab {
+  cursor: grab;
+}
+@utility b-cursor-grabbing {
+  cursor: grabbing;
+}
+
+/* ─── Input Focus ─── */
+@utility b-focus-ring {
+  outline: none;
+  border-color: #e8a33d;
+}
+
+/* ─── Placeholder ─── */
+@utility b-placeholder {
+  color: #3a3f58;
+}

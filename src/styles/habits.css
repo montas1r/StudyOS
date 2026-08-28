@@ -1,0 +1,252 @@
+/* BRUTALIST HEADER ══════════════════════════════════════════════ */
+
+
+.b-habits {
+  font-variant-numeric: tabular-nums;
+}
+
+.b-habits-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid #1e2133;
+  margin-bottom: 16px;
+}
+
+.b-habits-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.b-habits-title {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #edebe2;
+}
+
+.b-habits-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a5e78;
+  background: #161828;
+  border: 1px solid #1e2133;
+  padding: 2px 8px;
+  border-radius: 0;
+}
+
+.b-habits-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.b-habits-today-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #5a5e78;
+  text-transform: uppercase;
+}
+
+.b-habits-today-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e8a33d;
+}
+
+.b-habits-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.b-habits-add-input {
+  flex: 1;
+  background: #12141f;
+  border: 1px solid #1e2133;
+  border-radius: 0;
+  padding: 8px 10px;
+  color: #edebe2;
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+}
+
+.b-habits-add-input:focus {
+  outline: none;
+  border-color: #e8a33d;
+}
+
+.b-habits-add-input::placeholder {
+  color: #3a3f58;
+}
+
+.b-habits-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: #e8a33d;
+  border: 1px solid #e8a33d;
+  border-radius: 0;
+  color: #0d0f18;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.b-habits-add-btn:hover {
+  background: #d4922f;
+  border-color: #d4922f;
+}
+
+.b-habits-grid-wrap {
+  background: #12141f;
+  border: 1px solid #1e2133;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.b-habits-grid {
+  display: grid;
+  align-items: center;
+  min-width: 500px;
+}
+
+.b-habits-grid-header {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #3a3f58;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 8px 2px;
+  border-bottom: 1px solid #1e2133;
+}
+
+.b-habits-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #edebe2;
+  padding: 8px 10px;
+  border-bottom: 1px solid #161828;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.b-habits-cell-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #161828;
+}
+
+.b-habits-cell {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #2a2e42;
+  border-radius: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: transparent;
+  transition: all 0.15s ease;
+}
+
+.b-habits-cell:hover:not(:disabled) {
+  border-color: #e8a33d;
+}
+
+.b-habits-cell-done {
+  background: #6fbf8b;
+  border-color: #6fbf8b;
+  color: #0d0f18;
+}
+
+.b-habits-cell-future {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.b-habits-count-cell {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #5a5e78;
+  text-align: center;
+  padding: 8px 2px;
+  border-bottom: 1px solid #161828;
+}
+
+.b-habits-delete-cell {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #161828;
+}
+
+.b-habits-delete-btn {
+  background: none;
+  border: none;
+  color: #3a3f58;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  transition: color 0.12s ease;
+}
+
+.b-habits-delete-btn:hover {
+  color: #e1614b;
+}
+
+.b-habits-empty {
+  font-size: 11px;
+  color: #3a3f58;
+  padding: 24px 0;
+  text-align: center;
+  background: #12141f;
+  border: 1px solid #1e2133;
+}
+
+.b-habits-summary {
+  background: #12141f;
+  border: 1px solid #1e2133;
+  padding: 12px 16px;
+}
+
+.b-habits-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #161828;
+}
+
+.b-habits-summary-row:last-child {
+  border-bottom: none;
+}
+
+.b-habits-summary-label {
+  font-size: 11px;
+  color: #9498b0;
+}
+
+.b-habits-summary-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #edebe2;
+}
+

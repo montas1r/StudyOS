@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════
+   StudyOS — Modular CSS Architecture
+   ══════════════════════════════════════════════ */
+
+/* ── Core ── */
+@import "../styles/base.css";
+@import "../styles/utilities.css";
+@import "../styles/layout.css";
+
+/* ── Views ── */
+@import "../styles/focus.css";
+@import "../styles/dashboard.css";
+@import "../styles/tasks.css";
+@import "../styles/analytics.css";
+@import "../styles/settings.css";
+@import "../styles/goals.css";
+@import "../styles/habits.css";
+@import "../styles/subjects.css";

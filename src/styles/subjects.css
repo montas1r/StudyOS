@@ -1,0 +1,351 @@
+/* BRUTALIST HEADER ══════════════════════════════════════════════ */
+
+
+.b-subjects {
+  font-variant-numeric: tabular-nums;
+}
+
+.b-subjects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid #1e2133;
+  margin-bottom: 16px;
+}
+
+.b-subjects-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.b-subjects-title {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #edebe2;
+}
+
+.b-subjects-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a5e78;
+  background: #161828;
+  border: 1px solid #1e2133;
+  padding: 2px 8px;
+  border-radius: 0;
+}
+
+.b-subjects-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.b-subjects-stat {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: #5a5e78;
+}
+
+.b-subjects-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.b-subjects-add-input {
+  flex: 1;
+  background: #12141f;
+  border: 1px solid #1e2133;
+  border-radius: 0;
+  padding: 8px 10px;
+  color: #edebe2;
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+}
+
+.b-subjects-add-input:focus {
+  outline: none;
+  border-color: #e8a33d;
+}
+
+.b-subjects-add-input::placeholder {
+  color: #3a3f58;
+}
+
+.b-subjects-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: #e8a33d;
+  border: 1px solid #e8a33d;
+  border-radius: 0;
+  color: #0d0f18;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.b-subjects-add-btn:hover {
+  background: #d4922f;
+  border-color: #d4922f;
+}
+
+.b-subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.b-subjects-card {
+  background: #12141f;
+  border: 1px solid #1e2133;
+  padding: 14px;
+}
+
+.b-subjects-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.b-subjects-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.b-subjects-card-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.b-subjects-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #edebe2;
+}
+
+.b-subjects-card-delete {
+  background: none;
+  border: none;
+  color: #3a3f58;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  transition: color 0.12s ease;
+}
+
+.b-subjects-card-delete:hover {
+  color: #e1614b;
+}
+
+.b-subjects-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-bottom: 8px;
+}
+
+.b-subjects-card-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.b-subjects-card-stat-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #edebe2;
+  line-height: 1;
+}
+
+.b-subjects-card-stat-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  color: #3a3f58;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.b-subjects-card-bar-track {
+  width: 100%;
+  height: 3px;
+  background: #1a1d2e;
+  margin-bottom: 10px;
+}
+
+.b-subjects-card-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.b-subjects-mastery-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.b-subjects-mastery-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 600;
+  color: #5a5e78;
+}
+
+.b-subjects-mastery-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.b-subjects-mastery-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.b-subjects-mastery-dot:hover {
+  transform: scale(0.85);
+}
+
+.b-subjects-mastery-dot-active {
+  /* inherits bg from inline style */
+}
+
+.b-subjects-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.b-subjects-topic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.b-subjects-topic:hover {
+  opacity: 0.8;
+}
+
+.b-subjects-topic-check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.b-subjects-topic-check-done {
+  background: rgba(111, 191, 139, 0.12);
+}
+
+.b-subjects-topic-name {
+  font-size: 11px;
+  color: #edebe2;
+}
+
+.b-subjects-topic-name-done {
+  text-decoration: line-through;
+  color: #5a5e78;
+}
+
+.b-subjects-topic-bar-track {
+  width: 100%;
+  height: 2px;
+  background: #1a1d2e;
+  margin-bottom: 6px;
+}
+
+.b-subjects-topic-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.b-subjects-topic-add-form {
+  margin-top: 4px;
+}
+
+.b-subjects-topic-add-input {
+  width: 100%;
+  background: #0d0f18;
+  border: 1px solid #e8a33d;
+  border-radius: 0;
+  padding: 5px 8px;
+  color: #edebe2;
+  font-size: 11px;
+  font-family: "Inter", sans-serif;
+}
+
+.b-subjects-topic-add-input:focus {
+  outline: none;
+}
+
+.b-subjects-topic-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  padding: 5px;
+  margin-top: 4px;
+  background: transparent;
+  border: 1px dashed #1e2133;
+  border-radius: 0;
+  color: #3a3f58;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.b-subjects-topic-add-btn:hover {
+  border-color: #e8a33d40;
+  color: #e8a33d;
+}
+
+.b-subjects-empty {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #3a3f58;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .b-goals-columns {
+    grid-template-columns: 1fr;
+  }
+  .b-subjects-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

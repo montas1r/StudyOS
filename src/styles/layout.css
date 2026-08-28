@@ -1,0 +1,282 @@
+/* ══════════════════════════════════════════════
+   LAYOUT — Sidebar · TopBar · Main Panel
+   ══════════════════════════════════════════════ */
+
+/* ─── Root — full-bleed flex row ─── */
+.studyos-root {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ─── Sidebar ─── */
+.sidebar {
+  width: 256px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
+  margin-bottom: 16px;
+}
+
+.brand-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.brand-text {
+  font-family: "Fraunces", serif;
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.3px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: "Inter", sans-serif;
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  position: relative;
+}
+
+.nav-item:active {
+  transform: scale(0.97);
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item-active {
+  background: var(--surface-2);
+  color: var(--amber);
+}
+
+/* ─── Main content column ─── */
+.main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ─── Main Panel ─── */
+.main-panel {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 24px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.main-panel > * {
+  will-change: auto;
+}
+
+/* ─── Top Bar ─── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 48px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Scrollbar ─── */
+.main-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.main-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-panel::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.main-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--amber);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 1024px) {
+  .main-panel {
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 60px;
+    padding: 16px 8px;
+  }
+  .brand-text,
+  .nav-item span {
+    display: none;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 10px;
+  }
+  .brand {
+    justify-content: center;
+  }
+  .main-panel {
+    padding: 16px 12px;
+  }
+}
+
+/* ─── Edit Mode / Drag & Drop ─── */
+.card-drag-handle {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  z-index: 10;
+  cursor: grab;
+  opacity: 1;
+  transition: all 0.15s ease;
+}
+
+.card-drag-handle:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(232, 163, 61, 0.08);
+}
+
+.card-drag-handle:active {
+  cursor: grabbing;
+  transform: scale(0.9);
+  color: var(--amber);
+}
+
+.card-resize-handle {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  z-index: 10;
+  cursor: nwse-resize;
+  opacity: 1;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-resize-handle:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(232, 163, 61, 0.1);
+}
+
+.card-resize-handle:active {
+  transform: scale(0.85);
+  background: rgba(232, 163, 61, 0.15);
+}
+
+.card-size-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--amber);
+  background: rgba(232, 163, 61, 0.1);
+  border: 1px solid rgba(232, 163, 61, 0.25);
+  border-radius: 4px;
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Empty Grid Slots ─── */
+.grid-empty-slot {
+  border: 2px dashed var(--border-strong);
+  border-radius: 12px;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.grid-empty-slot-active {
+  border-color: var(--amber);
+  background: rgba(232, 163, 61, 0.04);
+  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.12);
+}
+
+.grid-empty-slot-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0.4;
+}
