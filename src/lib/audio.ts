@@ -203,7 +203,7 @@ export function isFrequencyActive(id: string): boolean {
 export function setFrequencyVolume(id: string, vol: number): void {
   const node = activeFrequenciesRef.get(id);
   if (node) {
-    node.masterGain.gain.setValueAtTime(vol, activeFrequenciesRef.get(id)!._ac.currentTime);
+    node.masterGain.gain.setValueAtTime(vol, (activeFrequenciesRef.get(id) as any)._ac.currentTime);
   }
 }
 
@@ -587,7 +587,6 @@ export function startFrequency(id: string, volume01: number): void {
     masterGain,
     nodes: allNodes,
     stop,
-    // @ts-expect-error — internal ref for volume updates
     _ac: ac,
   } as FrequencyNode & { _ac: AudioContext });
 }

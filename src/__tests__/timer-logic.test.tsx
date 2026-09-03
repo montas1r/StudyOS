@@ -29,7 +29,7 @@ vi.mock("framer-motion", () => {
                 domProps[k] = v;
               }
             }
-            return React.createElement(tag as string, { ...domProps, ref }, children);
+            return React.createElement(tag as string, { ...domProps, ref }, children as React.ReactNode);
           }),
       },
     );
@@ -707,7 +707,7 @@ describe("Reset button behavior", () => {
     mockTimer.setPhase.mockClear();
 
     // TimerWidget is mocked — invoke onReset directly from captured props
-    capturedTimerWidgetProps?.onReset();
+    (capturedTimerWidgetProps?.onReset as () => void)();
 
     expect(mockTimer.pause).toHaveBeenCalled();
     expect(mockTimer.setPhase).toHaveBeenCalledWith("work");
@@ -724,7 +724,7 @@ describe("Reset button behavior", () => {
     mockTimer.reset.mockClear();
 
     // TimerWidget is mocked — invoke onReset directly from captured props
-    capturedTimerWidgetProps?.onReset();
+    (capturedTimerWidgetProps?.onReset as () => void)();
 
     expect(mockTimer.reset).toHaveBeenCalledWith(FOCUS_MODES.short.work * 60);
   });
