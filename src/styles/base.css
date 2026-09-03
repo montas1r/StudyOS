@@ -4,18 +4,23 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
-/* ─── CSS Variables (dark theme) ─── */
+/* ─── CSS Variables (dark theme defaults — overridden by applyTheme) ─── */
 :root {
   --bg: #10121c;
+  --bg-primary: #10121c;
   --surface: #191c2b;
   --surface-2: #232739;
   --border: #2a2e42;
   --border-strong: #3a3f58;
   --text: #edebe2;
   --text-dim: #9498b0;
+  --accent-color: #e8a33d;
   --amber: #e8a33d;
   --green: #6fbf8b;
   --red: #e1614b;
+  --card-bg: #12141f;
+  --sidebar-bg: #0d0f18;
+  --topbar-bg: #0d0f18;
 }
 
 /* ─── Reset & Base ─── */
@@ -46,6 +51,29 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Theme Transition ─── */
+/* Only active during applyTheme() — no perf cost during normal interaction */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 0.35s ease,
+              color 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease,
+              outline-color 0.35s ease !important;
+}
+
+/* Prevent hover transitions from lagging */
+html.theme-transitioning a,
+html.theme-transitioning button,
+html.theme-transitioning input {
+  transition: background-color 0.35s ease,
+              color 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease !important;
 }
 
 /* ─── Animations ─── */

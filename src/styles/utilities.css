@@ -26,112 +26,112 @@
 
 /* ─── Colors — Text ─── */
 @utility b-text-bright {
-  color: #edebe2;
+  color: var(--text);
 }
 @utility b-text-dim {
-  color: #9498b0;
+  color: var(--text-dim);
 }
 @utility b-text-muted {
-  color: #5a5e78;
+  color: var(--text-dim);
 }
 @utility b-text-faint {
-  color: #3a3f58;
+  color: var(--text-dim);
 }
 @utility b-text-dim-2 {
-  color: #52525b;
+  color: var(--text-dim);
 }
 @utility b-text-zinc {
-  color: #d4d4d8;
+  color: var(--text);
 }
 @utility b-text-white {
-  color: #fafafa;
+  color: var(--text);
 }
 
 /* ─── Colors — Accent ─── */
 @utility b-amber {
-  color: #e8a33d;
+  color: var(--amber);
 }
 @utility b-green {
-  color: #6fbf8b;
+  color: var(--green);
 }
 @utility b-red {
-  color: #e1614b;
+  color: var(--red);
 }
 @utility b-amber-bright {
-  color: #f59e0b;
+  color: var(--amber);
 }
 
 /* ─── Colors — Backgrounds ─── */
 @utility b-bg-surface {
-  background: #12141f;
+  background: var(--card-bg);
 }
 @utility b-bg-base {
-  background: #0d0f18;
+  background: var(--sidebar-bg);
 }
 @utility b-bg-card {
-  background: #18181b;
+  background: var(--surface);
 }
 @utility b-bg-deep {
-  background: #0f1120;
+  background: var(--bg);
 }
 @utility b-bg-panel {
-  background: #161828;
+  background: var(--border);
 }
 @utility b-bg-grid {
-  background: #1a1d2e;
+  background: var(--border);
 }
 @utility b-bg-row {
-  background: #141416;
+  background: var(--border);
 }
 @utility b-bg-amber {
-  background: #e8a33d;
+  background: var(--amber);
 }
 @utility b-bg-amber-subtle {
-  background: rgba(232, 163, 61, 0.06);
+  background: color-mix(in srgb, var(--amber) 6%, transparent);
 }
 @utility b-bg-amber-ghost {
-  background: rgba(232, 163, 61, 0.08);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
 }
 @utility b-bg-amber-wash {
-  background: rgba(232, 163, 61, 0.04);
+  background: color-mix(in srgb, var(--amber) 4%, transparent);
 }
 @utility b-bg-red-subtle {
-  background: rgba(225, 97, 75, 0.04);
+  background: color-mix(in srgb, var(--red) 4%, transparent);
 }
 @utility b-bg-red-ghost {
-  background: rgba(225, 97, 75, 0.08);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
 }
 @utility b-bg-green-ghost {
-  background: rgba(111, 191, 139, 0.08);
+  background: color-mix(in srgb, var(--green) 8%, transparent);
 }
 
 /* ─── Borders ─── */
 @utility b-border {
-  border: 1px solid #1e2133;
+  border: 1px solid var(--border);
 }
 @utility b-border-b {
-  border-bottom: 1px solid #1e2133;
+  border-bottom: 1px solid var(--border);
 }
 @utility b-border-t {
-  border-top: 1px solid #1e2133;
+  border-top: 1px solid var(--border);
 }
 @utility b-border-r {
-  border-right: 1px solid #1e2133;
+  border-right: 1px solid var(--border);
 }
 @utility b-border-strong {
-  border: 1px solid #2a2e42;
+  border: 1px solid var(--border-strong);
 }
 @utility b-border-amber {
-  border: 1px solid #e8a33d;
+  border: 1px solid var(--amber);
 }
 @utility b-border-red {
-  border: 1px solid #e1614b40;
+  border: 1px solid var(--red)40;
 }
 @utility b-border-dashed {
-  border: 1px dashed #1e2133;
+  border: 1px dashed var(--border);
 }
 @utility b-border-dashed-amber {
-  border: 1px dashed #e8a33d;
+  border: 1px dashed var(--amber);
 }
 
 /* ─── Letter Spacing ─── */
@@ -205,10 +205,10 @@
 /* ─── Input Focus ─── */
 @utility b-focus-ring {
   outline: none;
-  border-color: #e8a33d;
+  border-color: var(--amber);
 }
 
 /* ─── Placeholder ─── */
 @utility b-placeholder {
-  color: #3a3f58;
+  color: var(--text-dim);
 }

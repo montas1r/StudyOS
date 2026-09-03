@@ -69,7 +69,7 @@ export interface Settings {
   completionChime: boolean;
   warningTick: boolean;
   notificationsEnabled: boolean;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "cyberpunk" | "matcha" | "midnight" | "forest" | "espresso";
   hotkeyPlayPause: string;
   hotkeyReset: string;
   hotkeySkip: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
 export interface TimerWidgetProps {
@@ -12,10 +12,8 @@ export interface TimerWidgetProps {
   phase: "work" | "rest";
   /** Whether timer is running */
   isRunning: boolean;
-  /** Session number (1-indexed) */
+  /** Session number (1-indexed, unbounded) */
   sessionNum: number;
-  /** Target sessions per day */
-  targetSessions: number;
   /** Focus minutes for current mode */
   focusMin: number;
   /** Break minutes for current mode */
@@ -34,6 +32,14 @@ export interface TimerWidgetProps {
   onSkip: () => void;
   /** Phase label */
   phaseLabel: string;
+  /** Long break duration in minutes */
+  longBreakMin: number;
+  /** Callback when work duration is edited */
+  onEditWorkDuration: (minutes: number) => void;
+  /** Callback when short break duration is edited */
+  onEditShortBreak: (minutes: number) => void;
+  /** Callback when long break duration is edited */
+  onEditLongBreak: (minutes: number) => void;
 }
 
 function AnimatedDigit({ digit, color }: { digit: string; color: string }) {
@@ -66,13 +72,74 @@ function AnimatedColon({ color }: { color: string }) {
   );
 }
 
+function EditableDuration({
+  value,
+  color,
+  disabled,
+  onSave,
+}: {
+  value: number;
+  color: string;
+  disabled: boolean;
+  onSave: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(String(value));
+  }, [value, editing]);
+
+  const commit = () => {
+    const n = parseInt(draft, 10);
+    if (!isNaN(n) && n >= 1) onSave(n);
+    else setDraft(String(value));
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="tw-metric-input"
+        type="number"
+        min={1}
+        max={180}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") { setDraft(String(value)); setEditing(false); }
+        }}
+        style={{ color, border: `1px solid ${color}` }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className="tw-metric-val tw-metric-val-editable"
+      style={{ color }}
+      data-disabled={disabled || undefined}
+      onClick={() => { if (!disabled) setEditing(true); }}
+    >
+      {value}m
+    </span>
+  );
+}
+
 export default function TimerWidget({
   remaining,
   totalSeconds,
   phase,
   isRunning,
   sessionNum,
-  targetSessions,
   focusMin,
   breakMin,
   accentColor,
@@ -82,6 +149,10 @@ export default function TimerWidget({
   onReset,
   onSkip,
   phaseLabel,
+  longBreakMin,
+  onEditWorkDuration,
+  onEditShortBreak,
+  onEditLongBreak,
 }: TimerWidgetProps) {
   const progress = totalSeconds > 0 ? 1 - remaining / totalSeconds : 0;
   const pct = Math.min(100, Math.max(0, progress * 100));
@@ -97,8 +168,10 @@ export default function TimerWidget({
   const secDigits = useMemo(() => seconds.split(""), [seconds]);
 
   const pomBlocks = useMemo(() => {
-    return Array.from({ length: targetSessions }, (_, i) => i < sessionNum);
-  }, [sessionNum, targetSessions]);
+    const max = 8;
+    const count = Math.min(sessionNum, max);
+    return Array.from({ length: max }, (_, i) => i < count);
+  }, [sessionNum]);
 
   return (
     <LayoutGroup>
@@ -125,7 +198,6 @@ export default function TimerWidget({
             <div className="tw-session-pill" style={{ borderColor: accentColor }}>
               <span style={{ color: accentColor }}>SESSION</span>
               <span className="tw-session-num" style={{ color: accentColor }}>{sessionNum}</span>
-              <span style={{ color: "#5a5e78" }}>/ {targetSessions}</span>
             </div>
           </div>
 
@@ -172,14 +244,35 @@ export default function TimerWidget({
         <div className="tw-metrics-row">
           <div className="tw-metric">
             <div className="tw-metric-dot" style={{ backgroundColor: accentColor }} />
-            <span className="tw-metric-val" style={{ color: accentColor }}>{focusMin}m</span>
+            <EditableDuration
+              value={focusMin}
+              color={accentColor}
+              disabled={isRunning}
+              onSave={onEditWorkDuration}
+            />
             <span className="tw-metric-lbl">FOCUS</span>
           </div>
           <div className="tw-metric-sep" />
           <div className="tw-metric">
             <div className="tw-metric-dot" style={{ backgroundColor: "#6fbf8b" }} />
-            <span className="tw-metric-val" style={{ color: "#6fbf8b" }}>{breakMin}m</span>
+            <EditableDuration
+              value={breakMin}
+              color="#6fbf8b"
+              disabled={isRunning}
+              onSave={onEditShortBreak}
+            />
             <span className="tw-metric-lbl">BREAK</span>
+          </div>
+          <div className="tw-metric-sep" />
+          <div className="tw-metric">
+            <div className="tw-metric-dot" style={{ backgroundColor: "#4fbdba" }} />
+            <EditableDuration
+              value={longBreakMin}
+              color="#4fbdba"
+              disabled={isRunning}
+              onSave={onEditLongBreak}
+            />
+            <span className="tw-metric-lbl">LONG BREAK</span>
           </div>
         </div>
 

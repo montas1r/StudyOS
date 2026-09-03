@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import type { StudyData } from "@/types/studyos";
+import type { StudyData, Session } from "@/types/studyos";
 import { loadStudyDataSync, loadStudyData, saveStudyData, flushStorage } from "@/lib/storage";
-import { defaultData } from "@/lib/utils";
+import { defaultData, todayStr } from "@/lib/utils";
 
 interface StudyStore {
   data: StudyData;
@@ -43,9 +43,37 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
   },
 }));
 
+/* ── Habit log normalization ──────────────────────────────────────────────────
+ * One-time pass run at init.  Ensures every key in a habit's `log` is a valid
+ * YYYY-MM-DD string and that no stale / corrupt entries survive.  This makes
+ * the old 7-day checks seamlessly visible inside the new 30-day grid.         */
+
+const YYYYMMDD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeHabits(habits: StudyData["habits"]): StudyData["habits"] {
+  let changed = false;
+  const out = habits.map((h) => {
+    const keys = Object.keys(h.log);
+    const cleanLog: Record<string, boolean> = {};
+    for (const k of keys) {
+      if (YYYYMMDD_RE.test(k)) {
+        cleanLog[k] = !!h.log[k];
+      } else {
+        changed = true; // drop invalid key silently
+      }
+    }
+    return changed ? { ...h, log: cleanLog } : h;
+  });
+  return changed ? out : habits;
+}
+
 export async function initStudyStore() {
   const full = await loadStudyData();
-  useStudyStore.setState({ data: full, loaded: true });
+
+  // Normalize habit logs once on startup
+  const normalized = { ...full, habits: normalizeHabits(full.habits) };
+
+  useStudyStore.setState({ data: normalized, loaded: true });
 
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", () => flushStorage(useStudyStore.getState().data));
@@ -109,3 +137,46 @@ export const useDashboardData = () => useStudyStore(
     settings: s.data?.settings ?? EMPTY_SETTINGS,
   }))
 );
+
+/* ── Day Streak helpers ── */
+
+/** Count consecutive days of sessions ending at `endDate` (inclusive). */
+function countConsecutiveFrom(sessions: Session[], endDate: Date): number {
+  let s = 0;
+  for (let i = 0; ; i++) {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    if (sessions.some((sess) => sess.date === ds)) s++; else break;
+    if (i > 365) break;
+  }
+  return s;
+}
+
+/** Find the offset (0 = today) of the most recent day that has sessions. */
+function offsetOfMostRecentSession(sessions: Session[]): number {
+  for (let i = 0; i <= 365; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    if (sessions.some((sess) => sess.date === ds)) return i;
+  }
+  return 366;
+}
+
+/** Compute streak & activation state for the FocusView.
+ *  – If today has sessions → active streak (count includes today).
+ *  – Otherwise → retain the streak count from the most recent
+ *    day that *did* have sessions, displayed dimmed. */
+export function computeStreak(sessions: Session[]): { streak: number; streakActive: boolean } {
+  const today = todayStr();
+  const todayHasSession = sessions.some((s) => s.date === today);
+  if (todayHasSession) {
+    return { streak: countConsecutiveFrom(sessions, new Date()), streakActive: true };
+  }
+  const offset = offsetOfMostRecentSession(sessions);
+  if (offset > 365) return { streak: 0, streakActive: false };
+  const anchor = new Date();
+  anchor.setDate(anchor.getDate() - offset);
+  return { streak: countConsecutiveFrom(sessions, anchor), streakActive: false };
+}

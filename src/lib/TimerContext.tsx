@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { FOCUS_MODES, fmtClock } from "@/lib/utils";
+import { FOCUS_MODES, fmtClock, uid, todayStr } from "@/lib/utils";
 import { playCompletionChime, playWarningTick } from "@/lib/audio";
 import { sendCompletionNotification, requestNotificationPermission } from "@/lib/notifications";
+import { useStudyStore } from "@/lib/store";
 
 // ── BroadcastChannel multi-tab sync ──────────────────────────────────────────
 
@@ -66,6 +67,7 @@ function getChannel(): BroadcastChannel {
 const SYNC_INTERVAL_MS = 1000;
 const LEADER_CHECK_MS = 2000;
 const LEADER_TIMEOUT_MS = 6000;
+const HEARTBEAT_MS = 1000;
 
 // ── Offscreen canvas favicon helpers ─────────────────────────────────────────
 
@@ -156,6 +158,9 @@ export interface TimerState {
   stopwatchElapsedMs: number;
   sessionFocusMs: number;
   totalFocusMs: number;
+  sessionCount: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
   laps: { id: string; elapsedMs: number; label: string }[];
 }
 
@@ -169,6 +174,10 @@ export interface TimerContextValue extends TimerState {
   setSubjectId: (id: string) => void;
   setPhase: (p: "work" | "rest") => void;
   setShowCustomPanel: (v: boolean) => void;
+  setSessionCount: (v: number) => void;
+  setWorkDuration: (minutes: number) => void;
+  setShortBreakDuration: (minutes: number) => void;
+  setLongBreakDuration: (minutes: number) => void;
   onTimerComplete: (cb: () => void) => () => void;
   lap: () => void;
   resetStopwatch: () => void;
@@ -201,6 +210,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [sessionFocusMs, setSessionFocusMs] = useState(0);
   const [totalFocusMs, setTotalFocusMs] = useState(0);
   const [laps, setLaps] = useState<{ id: string; elapsedMs: number; label: string }[]>([]);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [shortBreakDuration, setShortBreakDurationState] = useState(1);
+  const [longBreakDuration, setLongBreakDurationState] = useState(15);
 
   // ── Refs ─────────────────────────────────────────────────────────────────────
   const rafIdRef = useRef<number | null>(null);
@@ -221,16 +233,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const modeKeyRef = useRef(modeKey);
   const customWorkRef = useRef(customWork);
   const customRestRef = useRef(customRest);
+  const modeWorkOverridesRef = useRef<Record<string, number>>({});
+  const shortBreakDurationRef = useRef(shortBreakDuration);
+  const longBreakDurationRef = useRef(longBreakDuration);
+  const sessionCountRef = useRef(0);
+  const subjectIdRef = useRef("");
 
   // ── rAF fallback frozen+delta refs ───────────────────────────────────────────
-  /** Wall-clock ms when the stopwatch (and focus accumulators) started ticking.
-   *  null = paused.  Used only by the rAF fallback path. */
   const stopwatchStartTimeRef = useRef<number | null>(null);
-  /** Frozen stopwatch value captured at the last pause/start boundary. */
   const stopwatchFrozenMsRef = useRef(0);
-  /** Frozen session-focus value at last start boundary. */
   const sessionFrozenMsRef = useRef(0);
-  /** Frozen total-focus value at last start boundary. */
   const totalFrozenMsRef = useRef(0);
 
   // ── Multi-tab sync refs ──────────────────────────────────────────────────────
@@ -246,6 +258,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   // ── Title-sync refs ──────────────────────────────────────────────────────────
   const titleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Heartbeat (main-thread failsafe) refs ────────────────────────────────────
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Keep refs fresh
   phaseRef.current = phase;
   durationRef.current = durationSeconds;
@@ -254,6 +269,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   customRestRef.current = customRest;
   remainingRef.current = remaining;
   runningRef.current = running;
+  shortBreakDurationRef.current = shortBreakDuration;
+  longBreakDurationRef.current = longBreakDuration;
+  sessionCountRef.current = sessionCount;
+  subjectIdRef.current = subjectId;
 
   // ── computeRemaining ─────────────────────────────────────────────────────────
 
@@ -303,9 +322,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   // ── getMode ──────────────────────────────────────────────────────────────────
 
   const getMode = useCallback(
-    () => modeKeyRef.current === "custom"
-      ? { label: "Custom", work: customWorkRef.current, rest: customRestRef.current }
-      : FOCUS_MODES[modeKeyRef.current],
+    () => {
+      if (modeKeyRef.current === "custom") {
+        return { label: "Custom", work: customWorkRef.current, rest: customRestRef.current };
+      }
+      const base = FOCUS_MODES[modeKeyRef.current];
+      const workOverride = modeWorkOverridesRef.current[modeKeyRef.current];
+      return { ...base, work: workOverride ?? base.work };
+    },
     []
   );
 
@@ -362,6 +386,221 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       localTickIntervalRef.current = null;
     }
   }, []);
+
+  // ── Heartbeat (main-thread failsafe) ─────────────────────────────────────────
+  // A 1-second setInterval on the main thread that re-computes remaining from
+  // the wall-clock anchor.  This catches expiry even when both the Web Worker
+  // interval and rAF are killed by browser background-tab throttling.
+
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current !== null) return;
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (targetEndTimeRef.current === null || !runningRef.current) return;
+      const now = Date.now();
+      const rem = Math.max(0, Math.ceil((targetEndTimeRef.current - now) / 1000));
+
+      // Keep display in sync
+      setRemaining(rem);
+      remainingRef.current = rem;
+
+      // Keep stopwatch / focus accumulators in sync (work phase only)
+      if (phaseRef.current === "work" && stopwatchStartTimeRef.current !== null) {
+        const dt = now - stopwatchStartTimeRef.current;
+        const sw = stopwatchFrozenMsRef.current + dt;
+        setStopwatchElapsedMs(sw);
+        stopwatchElapsedMsRef.current = sw;
+        const sf = sessionFrozenMsRef.current + dt;
+        setSessionFocusMs(sf);
+        sessionFocusMsRef.current = sf;
+        const tf = totalFrozenMsRef.current + dt;
+        setTotalFocusMs(tf);
+        totalFocusMsRef.current = tf;
+      }
+
+      // Fire completion if the target has passed
+      if (rem <= 0) {
+        handleCompletionRef.current();
+      }
+    }, HEARTBEAT_MS);
+  }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current !== null) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  // ── Consolidated completion handler (ref-stable) ─────────────────────────────
+  // Every code-path that needs to "complete" a session calls this single
+  // function so the logic is never duplicated or accidentally divergent.
+
+  const handleCompletionRef = useRef<() => void>(() => {});
+  handleCompletionRef.current = () => {
+    // Guard: only complete once
+    if (targetEndTimeRef.current === null && !runningRef.current) return;
+
+    // 1. Immediately cancel any in-flight tick sources
+    if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+    if (workerRef.current) { try { workerRef.current.postMessage({ type: "stop" }); } catch { /* noop */ } }
+
+    // 2. Freeze accumulators at the exact completion instant
+    if (phaseRef.current === "work" && stopwatchStartTimeRef.current !== null) {
+      const dt = Date.now() - stopwatchStartTimeRef.current;
+      stopwatchElapsedMsRef.current = stopwatchFrozenMsRef.current + dt;
+      sessionFocusMsRef.current = sessionFrozenMsRef.current + dt;
+      totalFocusMsRef.current = totalFrozenMsRef.current + dt;
+    }
+
+    // 3. Clear wall-clock anchors
+    targetEndTimeRef.current = null;
+    stopwatchStartTimeRef.current = null;
+    warnedSecondRef.current = -1;
+
+    // 4. Update React state
+    setRemaining(0);
+    remainingRef.current = 0;
+    pausedRemainingRef.current = 0;
+    setRunning(false);
+    runningRef.current = false;
+    setStopwatchElapsedMs(stopwatchElapsedMsRef.current);
+    setSessionFocusMs(sessionFocusMsRef.current);
+    setTotalFocusMs(totalFocusMsRef.current);
+
+    // 5. Stop auxiliary intervals
+    stopTitleSync();
+    stopSyncInterval();
+    stopHeartbeat();
+    stopLocalTick();
+
+    // 6. Audio & notifications
+    try { playCompletionChime(); } catch { /* audio ctx may be suspended */ }
+    try { sendCompletionNotification(phaseRef.current, getMode().label); } catch { /* noop */ }
+
+    // 7. Broadcast to other tabs
+    broadcast({
+      type: "sync",
+      senderId: TAB_ID,
+      targetEndTime: null,
+      sentAt: Date.now(),
+      phase: phaseRef.current,
+      modeKey: modeKeyRef.current,
+      durationSeconds: durationRef.current,
+      customWork: customWorkRef.current,
+      customRest: customRestRef.current,
+      running: false,
+      pausedRemaining: 0,
+    });
+    remoteRunningRef.current = false;
+
+    // 8. Session logging & automatic phase transition
+    const completedPhase = phaseRef.current;
+    const store = useStudyStore.getState();
+    const s = store.data.settings;
+
+    if (completedPhase === "work") {
+      // ── Log completed focus session to store ──
+      const m = getMode();
+      const elapsedMs = sessionFocusMsRef.current > 0 ? sessionFocusMsRef.current : m.work * 60000;
+      const elapsedMin = Math.max(1, Math.round(elapsedMs / 60000));
+      store.setData((d) => ({
+        ...d,
+        sessions: [
+          ...d.sessions,
+          {
+            id: uid(),
+            date: todayStr(),
+            startTime: new Date().toISOString(),
+            subjectId: subjectIdRef.current,
+            minutes: elapsedMin,
+            mode: m.label,
+            subtasksCompleted: 0,
+            distractionTags: [],
+          },
+        ],
+      }));
+
+      // ── Increment session count ──
+      const newCount = sessionCountRef.current + 1;
+      sessionCountRef.current = newCount;
+      setSessionCount(newCount);
+
+      // ── Compute break duration ──
+      const longInterval = Number.isFinite(s.longBreakInterval) && s.longBreakInterval > 0 ? s.longBreakInterval : 4;
+      const isLong = newCount > 0 && newCount % longInterval === 0;
+      let breakDur: number;
+      if (modeKeyRef.current === "short") {
+        breakDur = shortBreakDurationRef.current * 60;
+      } else {
+        breakDur = isLong ? longBreakDurationRef.current * 60 : shortBreakDurationRef.current * 60;
+      }
+
+      // ── Transition to rest phase ──
+      setPhase("rest");
+      phaseRef.current = "rest";
+      pausedRemainingRef.current = breakDur;
+      setRemaining(breakDur);
+      remainingRef.current = breakDur;
+      setDurationSeconds(breakDur);
+
+      broadcast({
+        type: "sync",
+        senderId: TAB_ID,
+        targetEndTime: null,
+        sentAt: Date.now(),
+        phase: "rest",
+        modeKey: modeKeyRef.current,
+        durationSeconds: breakDur,
+        customWork: customWorkRef.current,
+        customRest: customRestRef.current,
+        running: false,
+        pausedRemaining: breakDur,
+      });
+
+      if (s.autoStartBreak) {
+        queueMicrotask(() => { start(); });
+      }
+    } else {
+      // ── Break completed — transition back to work ──
+      const m = getMode();
+      setPhase("work");
+      phaseRef.current = "work";
+      pausedRemainingRef.current = m.work * 60;
+      setRemaining(m.work * 60);
+      remainingRef.current = m.work * 60;
+      setDurationSeconds(m.work * 60);
+
+      broadcast({
+        type: "sync",
+        senderId: TAB_ID,
+        targetEndTime: null,
+        sentAt: Date.now(),
+        phase: "work",
+        modeKey: modeKeyRef.current,
+        durationSeconds: m.work * 60,
+        customWork: customWorkRef.current,
+        customRest: customRestRef.current,
+        running: false,
+        pausedRemaining: m.work * 60,
+      });
+
+      if (s.autoStartFocus) {
+        queueMicrotask(() => { start(); });
+      }
+    }
+
+    // 9. Fire any remaining consumer callbacks (extensibility)
+    for (const cb of completeCallbacksRef.current) {
+      try { cb(); } catch { /* don't let one callback block others */ }
+    }
+
+    // 10. Reset per-session accumulator
+    setSessionFocusMs(0);
+    sessionFocusMsRef.current = 0;
+    if (workerRef.current) {
+      try { workerRef.current.postMessage({ type: "reset-session" }); } catch { /* noop */ }
+    }
+  };
 
   // ── BroadcastChannel message handler ─────────────────────────────────────────
 
@@ -524,6 +763,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             rafIdRef.current = requestAnimationFrame(tick);
           }
           startSyncInterval();
+          startHeartbeat();
         }
         remoteRunningRef.current = false;
       }
@@ -540,11 +780,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       if (titleIntervalRef.current !== null) { clearInterval(titleIntervalRef.current); titleIntervalRef.current = null; }
       stopSyncInterval();
       stopLocalTick();
+      stopHeartbeat();
       targetEndTimeRef.current = null;
       stopwatchStartTimeRef.current = null;
       try { channel?.close(); channel = null; } catch { /* noop */ }
     };
-  }, [stopSyncInterval, stopLocalTick]);
+  }, [stopSyncInterval, stopLocalTick, stopHeartbeat]);
 
   // ── Worker setup ─────────────────────────────────────────────────────────────
 
@@ -609,34 +850,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             break;
           }
           case "complete": {
-            if (!runningRef.current) return; // already handled
-            targetEndTimeRef.current = null;
-            stopwatchStartTimeRef.current = null;
-            runningRef.current = false;
-            setRunning(false);
-            warnedSecondRef.current = -1;
-            stopTitleSync();
-            stopSyncInterval();
-            playCompletionChime();
-            sendCompletionNotification(phaseRef.current, getMode().label);
-            broadcast({
-              type: "sync",
-              senderId: TAB_ID,
-              targetEndTime: null,
-              sentAt: Date.now(),
-              phase: phaseRef.current,
-              modeKey: modeKeyRef.current,
-              durationSeconds: durationRef.current,
-              customWork: customWorkRef.current,
-              customRest: customRestRef.current,
-              running: false,
-              pausedRemaining: 0,
-            });
-            remoteRunningRef.current = false;
-            for (const cb of completeCallbacksRef.current) cb();
-            setSessionFocusMs(0);
-            sessionFocusMsRef.current = 0;
-            if (workerRef.current) workerRef.current.postMessage({ type: "reset-session" });
+            handleCompletionRef.current();
             break;
           }
           case "session-reset": {
@@ -654,8 +868,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       };
 
       w.onerror = () => {
+        // Worker crashed — fall back to rAF for the remainder of the session
         useWorkerRef.current = false;
         workerRef.current = null;
+        if (runningRef.current && targetEndTimeRef.current !== null) {
+          rafIdRef.current = requestAnimationFrame(tick);
+          startHeartbeat();
+        }
       };
     } catch {
       useWorkerRef.current = false;
@@ -704,52 +923,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     if (rem <= 0) {
       rafIdRef.current = null;
-      // Freeze accumulators at completion
-      if (phaseRef.current === "work" && stopwatchStartTimeRef.current !== null) {
-        const dt = now - stopwatchStartTimeRef.current;
-        stopwatchElapsedMsRef.current = stopwatchFrozenMsRef.current + dt;
-        sessionFocusMsRef.current = sessionFrozenMsRef.current + dt;
-        totalFocusMsRef.current = totalFrozenMsRef.current + dt;
-      }
-      targetEndTimeRef.current = null;
-      stopwatchStartTimeRef.current = null;
-      runningRef.current = false;
-      setRunning(false);
-      warnedSecondRef.current = -1;
-      stopTitleSync();
-      stopSyncInterval();
-      playCompletionChime();
-      sendCompletionNotification(phaseRef.current, getMode().label);
-      broadcast({
-        type: "sync",
-        senderId: TAB_ID,
-        targetEndTime: null,
-        sentAt: Date.now(),
-        phase: phaseRef.current,
-        modeKey: modeKeyRef.current,
-        durationSeconds: durationRef.current,
-        customWork: customWorkRef.current,
-        customRest: customRestRef.current,
-        running: false,
-        pausedRemaining: 0,
-      });
-      remoteRunningRef.current = false;
-      for (const cb of completeCallbacksRef.current) cb();
-      setSessionFocusMs(0);
-      sessionFocusMsRef.current = 0;
-      if (workerRef.current) workerRef.current.postMessage({ type: "reset-session" });
+      handleCompletionRef.current();
       return;
     }
 
     rafIdRef.current = requestAnimationFrame(tick);
-  }, [getMode, broadcast, stopTitleSync, stopSyncInterval]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Visibility change — immediate re-sync for both timers ────────────────────
-  /**
-   * When the tab regains focus we re-derive BOTH countdown remaining
-   * AND stopwatch elapsed from their wall-clock anchors instantly,
-   * ensuring second-for-second alignment across tab switches.
-   */
 
   useEffect(() => {
     const onVisibility = () => {
@@ -761,6 +942,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setRemaining(rem);
         remainingRef.current = rem;
         pausedRemainingRef.current = rem;
+
+        // ── Handle timer expiry while hidden ──
+        if (rem <= 0) {
+          handleCompletionRef.current();
+          return;
+        }
       }
 
       // ── Re-derive stopwatch from wall-clock anchor ──
@@ -777,58 +964,41 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         totalFocusMsRef.current = tf;
       }
 
-      // ── Handle timer expiry while hidden ──
-      if (targetEndTimeRef.current !== null) {
-        const rem = Math.max(0, Math.ceil((targetEndTimeRef.current - Date.now()) / 1000));
-        if (rem <= 0) {
-          if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-          if (workerRef.current) { workerRef.current.postMessage({ type: "stop" }); }
-          targetEndTimeRef.current = null;
-          stopwatchStartTimeRef.current = null;
-          runningRef.current = false;
-          setRunning(false);
-          warnedSecondRef.current = -1;
-          stopTitleSync();
-          stopSyncInterval();
-          playCompletionChime();
-          sendCompletionNotification(phaseRef.current, getMode().label);
-          broadcast({
-            type: "sync",
-            senderId: TAB_ID,
-            targetEndTime: null,
-            sentAt: Date.now(),
-            phase: phaseRef.current,
-            modeKey: modeKeyRef.current,
-            durationSeconds: durationRef.current,
-            customWork: customWorkRef.current,
-            customRest: customRestRef.current,
-            running: false,
-            pausedRemaining: 0,
-          });
-          remoteRunningRef.current = false;
-          for (const cb of completeCallbacksRef.current) cb();
-          setSessionFocusMs(0);
-          sessionFocusMsRef.current = 0;
-          if (workerRef.current) workerRef.current.postMessage({ type: "reset-session" });
-          return;
-        }
-      }
-
       // Restart title-sync with the corrected targetEndTime
       if (targetEndTimeRef.current !== null) {
         startTitleSync(phaseRef.current, targetEndTimeRef.current);
       }
 
-      // Re-kick the rAF loop from the corrected value
+      // ── Re-kick the active tick source ──
       if (isLeaderRef.current && targetEndTimeRef.current !== null) {
-        if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = requestAnimationFrame(tick);
+        if (useWorkerRef.current && workerRef.current) {
+          // Nudge the worker: re-post start so its interval is definitely alive.
+          // The worker's start handler clears the old interval and creates a new one,
+          // but we preserve accumulated state via the frozen+delta refs.
+          try {
+            workerRef.current.postMessage({
+              type: "start",
+              targetEndTime: targetEndTimeRef.current,
+              durationSeconds: durationRef.current,
+              phase: phaseRef.current,
+              stopwatchStartMs: stopwatchStartTimeRef.current ?? 0,
+              pausedStopwatchMs: stopwatchElapsedMsRef.current,
+              totalFocusMs: totalFocusMsRef.current,
+            });
+          } catch { /* worker may have crashed — heartbeat covers it */ }
+        } else {
+          if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = requestAnimationFrame(tick);
+        }
+        // Always ensure the main-thread heartbeat is running as a failsafe
+        startHeartbeat();
       }
     };
 
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [tick, startTitleSync, stopTitleSync, getMode, broadcast, stopSyncInterval]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, startTitleSync, stopTitleSync, getMode, broadcast, stopSyncInterval, startHeartbeat]);
 
   // ── Timer controls ───────────────────────────────────────────────────────────
 
@@ -868,6 +1038,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     startTitleSync(phaseRef.current, targetEndTimeRef.current);
     startSyncInterval();
+    startHeartbeat();
     requestNotificationPermission();
 
     broadcast({
@@ -883,7 +1054,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       running: true,
       pausedRemaining: pausedRemainingRef.current,
     });
-  }, [tick, startTitleSync, startSyncInterval, broadcast]);
+  }, [tick, startTitleSync, startSyncInterval, broadcast, startHeartbeat]);
 
   const pause = useCallback(() => {
     if (targetEndTimeRef.current === null) return;
@@ -922,10 +1093,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stopTitleSync();
     stopSyncInterval();
     stopLocalTick();
+    stopHeartbeat();
     remoteRunningRef.current = false;
 
     broadcast({ type: "pause", senderId: TAB_ID, remaining: rem, sentAt: Date.now() });
-  }, [computeRemaining, stopTitleSync, stopSyncInterval, stopLocalTick, broadcast]);
+  }, [computeRemaining, stopTitleSync, stopSyncInterval, stopLocalTick, broadcast, stopHeartbeat]);
 
   const reset = useCallback((newDuration?: number) => {
     // ① Immediately cancel worker ticks and rAF
@@ -939,7 +1111,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     targetEndTimeRef.current = null;
     stopwatchStartTimeRef.current = null;
     warnedSecondRef.current = -1;
-    const dur = newDuration ?? durationRef.current;
+    let dur = newDuration ?? durationRef.current;
+    // Sync to user-defined short break when entering rest in short mode
+    if (phaseRef.current === "rest" && modeKeyRef.current === "short") {
+      dur = shortBreakDurationRef.current * 60;
+    }
     pausedRemainingRef.current = dur;
     setRemaining(dur);
     remainingRef.current = dur;
@@ -951,6 +1127,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stopTitleSync();
     stopSyncInterval();
     stopLocalTick();
+    stopHeartbeat();
     remoteRunningRef.current = false;
 
     broadcast({
@@ -964,7 +1141,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       customWork: customWorkRef.current,
       customRest: customRestRef.current,
     });
-  }, [stopTitleSync, stopSyncInterval, stopLocalTick, broadcast]);
+  }, [stopTitleSync, stopSyncInterval, stopLocalTick, broadcast, stopHeartbeat]);
 
   const complete = useCallback(() => {
     if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
@@ -976,8 +1153,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stopTitleSync();
     stopSyncInterval();
     stopLocalTick();
+    stopHeartbeat();
     remoteRunningRef.current = false;
-  }, [stopTitleSync, stopSyncInterval, stopLocalTick]);
+  }, [stopTitleSync, stopSyncInterval, stopLocalTick, stopHeartbeat]);
 
   const onTimerComplete = useCallback((cb: () => void) => {
     completeCallbacksRef.current.add(cb);
@@ -1053,6 +1231,35 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     phaseRef.current = p;
   }, []);
 
+  // ── Duration editing setters ─────────────────────────────────────────────
+
+  const setWorkDuration = useCallback((minutes: number) => {
+    const clamped = Math.max(1, Math.min(180, Math.round(minutes)));
+    modeWorkOverridesRef.current = { ...modeWorkOverridesRef.current, [modeKeyRef.current]: clamped };
+    if (!runningRef.current && phaseRef.current === "work") {
+      pausedRemainingRef.current = clamped * 60;
+      setRemaining(clamped * 60);
+      remainingRef.current = clamped * 60;
+      setDurationSeconds(clamped * 60);
+    }
+  }, []);
+
+  const setShortBreakDuration = useCallback((minutes: number) => {
+    const clamped = Math.max(1, Math.min(60, Math.round(minutes)));
+    setShortBreakDurationState(clamped);
+    if (!runningRef.current && phaseRef.current === "rest") {
+      pausedRemainingRef.current = clamped * 60;
+      setRemaining(clamped * 60);
+      remainingRef.current = clamped * 60;
+      setDurationSeconds(clamped * 60);
+    }
+  }, []);
+
+  const setLongBreakDuration = useCallback((minutes: number) => {
+    const clamped = Math.max(1, Math.min(120, Math.round(minutes)));
+    setLongBreakDurationState(clamped);
+  }, []);
+
   // ── Progress ─────────────────────────────────────────────────────────────────
 
   const progress = durationSeconds > 0 ? 1 - remaining / durationSeconds : 0;
@@ -1060,13 +1267,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const value: TimerContextValue = {
     remaining, running, phase, modeKey, customWork, customRest,
     subjectId, showCustomPanel, progress,
-    stopwatchElapsedMs, sessionFocusMs, totalFocusMs, laps,
+    stopwatchElapsedMs, sessionFocusMs, totalFocusMs, sessionCount, laps,
     start, pause, reset, lap, resetStopwatch, resetSession,
     setModeKey: syncModeKey,
     setCustomWork: syncCustomWork,
     setCustomRest: syncCustomRest,
     setSubjectId, setPhase: syncPhase,
-    setShowCustomPanel, onTimerComplete,
+    setShowCustomPanel,    setSessionCount, setWorkDuration, setShortBreakDuration, setLongBreakDuration,
+    shortBreakDuration, longBreakDuration,
+    onTimerComplete,
     _getMode: getMode,
   };
 

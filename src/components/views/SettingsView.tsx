@@ -18,6 +18,7 @@ import {
 import type { StudyData } from "@/types/studyos";
 import { FOCUS_MODES } from "@/lib/utils";
 import { useStudyStore } from "@/lib/store";
+import { THEMES, applyTheme, type ThemeId } from "@/lib/themes";
 
 const useSettings = () => useStudyStore((s) => s.data.settings);
 const useSubjects = () => useStudyStore((s) => s.data.subjects);
@@ -475,30 +476,45 @@ export default function SettingsView() {
             <div className="b-s-section">
               <div className="b-s-section-header">
                 <span className="b-s-section-title">APPEARANCE</span>
+                <span className="b-s-section-sub">Select a study-focused theme</span>
               </div>
-              <div className="b-s-theme-grid">
-                <button
-                  className={`b-s-theme-card ${s.theme === "dark" ? "b-s-theme-card-active" : ""}`}
-                  onClick={() => update({ theme: "dark" })}
-                >
-                  <div className="b-s-theme-preview b-s-theme-preview-dark">
-                    <div className="b-s-theme-bar" />
-                    <div className="b-s-theme-bar b-s-theme-bar-short" />
-                    <div className="b-s-theme-bar b-s-theme-bar-short" />
-                  </div>
-                  <span className="b-s-theme-label">Dark</span>
-                </button>
-                <button
-                  className={`b-s-theme-card ${s.theme === "light" ? "b-s-theme-card-active" : ""}`}
-                  onClick={() => update({ theme: "light" })}
-                >
-                  <div className="b-s-theme-preview b-s-theme-preview-light">
-                    <div className="b-s-theme-bar b-s-theme-bar-light" />
-                    <div className="b-s-theme-bar b-s-theme-bar-light b-s-theme-bar-short" />
-                    <div className="b-s-theme-bar b-s-theme-bar-light b-s-theme-bar-short" />
-                  </div>
-                  <span className="b-s-theme-label">Light</span>
-                </button>
+              <div className="b-s-theme-grid b-s-theme-grid-expanded">
+                {(Object.keys(THEMES) as ThemeId[]).map((id) => {
+                  const t = THEMES[id];
+                  const isActive = s.theme === id;
+                  return (
+                    <button
+                      key={id}
+                      className={`b-s-theme-card ${isActive ? "b-s-theme-card-active" : ""}`}
+                      onClick={() => {
+                        update({ theme: id });
+                        applyTheme(id);
+                      }}
+                    >
+                      <div
+                        className="b-s-theme-preview"
+                        style={{ background: t.preview.bg }}
+                      >
+                        <div className="b-s-theme-preview-row">
+                          <div className="b-s-theme-swatch" style={{ background: t.preview.accent }} />
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                            <div className="b-s-theme-bar" style={{ background: t.preview.surface, width: "100%" }} />
+                            <div className="b-s-theme-bar" style={{ background: t.preview.surface, width: "60%" }} />
+                          </div>
+                        </div>
+                        <div className="b-s-theme-preview-bottom">
+                          <div className="b-s-theme-bar" style={{ background: t.preview.accent, width: 24, height: 3 }} />
+                          <div className="b-s-theme-bar" style={{ background: t.preview.surface, width: 40, height: 3 }} />
+                        </div>
+                      </div>
+                      <div className="b-s-theme-meta">
+                        <span className="b-s-theme-label" style={isActive ? { color: t.preview.accent } : undefined}>{t.label}</span>
+                        <span className="b-s-theme-desc">{t.description}</span>
+                      </div>
+                      {isActive && <div className="b-s-theme-active-dot" style={{ background: t.preview.accent }} />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

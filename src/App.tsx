@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useCallback, Component, type ReactNode } from "react";
 import { Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { initStudyStore, useLoaded } from "@/lib/store";
+import { initStudyStore, useLoaded, useSettings } from "@/lib/store";
+import { applyTheme } from "@/lib/themes";
 import { resumeAudioContext } from "@/lib/audio";
 import { DragProvider } from "@/lib/DragContext";
 import { TimerProvider } from "@/lib/TimerContext";
@@ -95,6 +96,8 @@ export default function App() {
   const loaded = useLoaded();
 
   useEffect(() => { initStudyStore(); }, []);
+  const settings = useSettings();
+  useEffect(() => { applyTheme(settings.theme ?? "dark"); }, [settings.theme]);
 
   const handleShellClick = useCallback(() => {
     resumeAudioContext();

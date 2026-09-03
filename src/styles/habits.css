@@ -1,16 +1,17 @@
-/* BRUTALIST HEADER ══════════════════════════════════════════════ */
-
+/* BRUTALIST HABITS — 30-DAY TRACKING GRID ════════════════════════════ */
 
 .b-habits {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Header ─────────────────────────────────────────────────────── */
 
 .b-habits-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 0;
-  border-bottom: 1px solid #1e2133;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
 }
 
@@ -25,16 +26,16 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #edebe2;
+  color: var(--text);
 }
 
 .b-habits-count {
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   font-weight: 700;
-  color: #5a5e78;
-  background: #161828;
-  border: 1px solid #1e2133;
+  color: var(--text-dim);
+  background: var(--border);
+  border: 1px solid var(--border);
   padding: 2px 8px;
   border-radius: 0;
 }
@@ -50,7 +51,7 @@
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #5a5e78;
+  color: var(--text-dim);
   text-transform: uppercase;
 }
 
@@ -58,33 +59,35 @@
   font-family: "JetBrains Mono", monospace;
   font-size: 12px;
   font-weight: 700;
-  color: #e8a33d;
+  color: var(--amber);
 }
+
+/* ── Add row ────────────────────────────────────────────────────── */
 
 .b-habits-add-row {
   display: flex;
   gap: 6px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .b-habits-add-input {
   flex: 1;
-  background: #12141f;
-  border: 1px solid #1e2133;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 0;
   padding: 8px 10px;
-  color: #edebe2;
+  color: var(--text);
   font-size: 12px;
   font-family: "Inter", sans-serif;
 }
 
 .b-habits-add-input:focus {
   outline: none;
-  border-color: #e8a33d;
+  border-color: var(--amber);
 }
 
 .b-habits-add-input::placeholder {
-  color: #3a3f58;
+  color: var(--text-dim);
 }
 
 .b-habits-add-btn {
@@ -92,10 +95,10 @@
   align-items: center;
   gap: 4px;
   padding: 8px 14px;
-  background: #e8a33d;
-  border: 1px solid #e8a33d;
+  background: var(--amber);
+  border: 1px solid var(--amber);
   border-radius: 0;
-  color: #0d0f18;
+  color: var(--sidebar-bg);
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   font-weight: 700;
@@ -104,57 +107,223 @@
 }
 
 .b-habits-add-btn:hover {
-  background: #d4922f;
-  border-color: #d4922f;
+  background: var(--amber);
+  border-color: var(--amber);
 }
 
+/* ── Range selector bar ─────────────────────────────────────────── */
+
+.b-habits-range-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.b-habits-range-presets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.b-habits-range-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.b-habits-range-btn:hover {
+  border-color: var(--amber);
+  color: var(--text);
+}
+
+.b-habits-range-btn-active {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--sidebar-bg);
+}
+
+.b-habits-range-custom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.b-habits-range-date {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+
+.b-habits-range-date:focus {
+  border-color: var(--amber);
+}
+
+.b-habits-range-sep {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.b-habits-range-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ── Range stats bar ────────────────────────────────────────────── */
+
+.b-habits-range-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.b-habits-range-stat {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.b-habits-range-stat-pct {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+/* ── Grid wrap & scroll ─────────────────────────────────────────── */
+
 .b-habits-grid-wrap {
-  background: #12141f;
-  border: 1px solid #1e2133;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   overflow-x: auto;
   margin-bottom: 12px;
 }
 
-.b-habits-grid {
-  display: grid;
-  align-items: center;
-  min-width: 500px;
+.b-habits-grid-scroll {
+  min-width: 1040px;
 }
 
-.b-habits-grid-header {
+/* ── Row ────────────────────────────────────────────────────────── */
+
+.b-habits-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.b-habits-row:last-child {
+  border-bottom: none;
+}
+
+.b-habits-row-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card-bg);
+}
+
+/* ── Name cell ──────────────────────────────────────────────────── */
+
+.b-habits-name-cell {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-right: 1px solid var(--border);
+}
+
+.b-habits-name-cell-header {
   font-family: "JetBrains Mono", monospace;
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #3a3f58;
+  color: var(--text-dim);
   text-transform: uppercase;
-  text-align: center;
-  padding: 8px 2px;
-  border-bottom: 1px solid #1e2133;
 }
 
-.b-habits-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: #edebe2;
-  padding: 8px 10px;
-  border-bottom: 1px solid #161828;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* ── Day header ─────────────────────────────────────────────────── */
+
+.b-habits-day-header {
+  width: 28px;
+  min-width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  gap: 1px;
 }
+
+.b-habits-month-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--amber);
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.b-habits-day-num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-dim);
+  line-height: 1;
+}
+
+.b-habits-day-num-today {
+  color: var(--amber);
+}
+
+/* ── Cell wrap ──────────────────────────────────────────────────── */
 
 .b-habits-cell-wrap {
+  width: 28px;
+  min-width: 28px;
   display: flex;
   justify-content: center;
-  padding: 6px 0;
-  border-bottom: 1px solid #161828;
+  align-items: center;
+  padding: 4px 0;
 }
 
+/* ── Cell buttons ───────────────────────────────────────────────── */
+
 .b-habits-cell {
-  width: 24px;
-  height: 24px;
-  border: 1px solid #2a2e42;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
   border-radius: 0;
   background: transparent;
   display: flex;
@@ -165,42 +334,99 @@
   transition: all 0.15s ease;
 }
 
-.b-habits-cell:hover:not(:disabled) {
-  border-color: #e8a33d;
+.b-habits-cell:hover:not(:disabled):not(.b-habits-cell-done):not(.b-habits-cell-missed) {
+  border-color: var(--amber);
 }
 
+/* Done — green check */
 .b-habits-cell-done {
-  background: #6fbf8b;
-  border-color: #6fbf8b;
-  color: #0d0f18;
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--sidebar-bg);
 }
 
+/* Missed — red X for past unchecked days */
+.b-habits-cell-missed {
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  border-color: color-mix(in srgb, var(--red) 40%, transparent);
+  color: var(--red);
+}
+
+/* Today — subtle amber ring */
+.b-habits-cell-today {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 30%, transparent);
+}
+
+/* Future — dimmed, non-interactive */
 .b-habits-cell-future {
-  opacity: 0.2;
+  opacity: 0.15;
   cursor: default;
 }
 
-.b-habits-count-cell {
+/* ── Streak badge in name ───────────────────────────────────────── */
+
+.b-habits-streak-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--amber);
+  white-space: nowrap;
+  margin-left: 2px;
+}
+
+/* ── Streak / pct / del cells ───────────────────────────────────── */
+
+.b-habits-streak-cell {
+  width: 48px;
+  min-width: 48px;
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   font-weight: 600;
-  color: #5a5e78;
+  color: var(--text-dim);
   text-align: center;
-  padding: 8px 2px;
-  border-bottom: 1px solid #161828;
+  padding: 8px 4px;
+  border-left: 1px solid var(--border);
 }
 
-.b-habits-delete-cell {
+.b-habits-streak-cell-header {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.b-habits-pct-cell {
+  width: 40px;
+  min-width: 40px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 8px 2px;
+}
+
+.b-habits-pct-cell-header {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.b-habits-del-cell {
+  width: 36px;
+  min-width: 36px;
   display: flex;
   justify-content: center;
   padding: 8px 0;
-  border-bottom: 1px solid #161828;
 }
+
+/* ── Delete button ──────────────────────────────────────────────── */
 
 .b-habits-delete-btn {
   background: none;
   border: none;
-  color: #3a3f58;
+  color: var(--text-dim);
   cursor: pointer;
   padding: 2px;
   display: flex;
@@ -208,21 +434,25 @@
 }
 
 .b-habits-delete-btn:hover {
-  color: #e1614b;
+  color: var(--red);
 }
+
+/* ── Empty state ────────────────────────────────────────────────── */
 
 .b-habits-empty {
   font-size: 11px;
-  color: #3a3f58;
+  color: var(--text-dim);
   padding: 24px 0;
   text-align: center;
-  background: #12141f;
-  border: 1px solid #1e2133;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
 }
 
+/* ── Summary ────────────────────────────────────────────────────── */
+
 .b-habits-summary {
-  background: #12141f;
-  border: 1px solid #1e2133;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   padding: 12px 16px;
 }
 
@@ -231,7 +461,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid #161828;
+  border-bottom: 1px solid var(--border);
 }
 
 .b-habits-summary-row:last-child {
@@ -240,13 +470,12 @@
 
 .b-habits-summary-label {
   font-size: 11px;
-  color: #9498b0;
+  color: var(--text-dim);
 }
 
 .b-habits-summary-val {
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   font-weight: 700;
-  color: #edebe2;
+  color: var(--text);
 }
-

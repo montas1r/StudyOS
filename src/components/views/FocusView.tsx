@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Command, Flame, Clock, CheckCircle2, Circle, Volume2, BarChart3, Zap } from "lucide-react";
 import TimerWidget from "@/components/ui/TimerWidget";
 import type { Priority, TaskStatus, TaskCategory } from "@/types/studyos";
 import { FOCUS_MODES, todayStr, uid } from "@/lib/utils";
 import { useTimerContext } from "@/lib/TimerContext";
-import { useStudyStore } from "@/lib/store";
+import { useStudyStore, computeStreak } from "@/lib/store";
+import {
+  getSharedAudioContext,
+  FOCUS_FREQUENCIES,
+  startFrequency,
+  stopFrequency,
+  setFrequencyVolume,
+  isFrequencyActive,
+} from "@/lib/audio";
 
 const useSubjects = () => useStudyStore((s) => s.data.subjects);
 const useSessions = () => useStudyStore((s) => s.data.sessions);
@@ -17,20 +25,11 @@ const useSetData = () => useStudyStore((s) => s.setData);
 
 /* -- Priority colors (matte, no glow) -- */
 const PRIO: Record<Priority, { label: string; color: string; bg: string }> = {
-  critical: { label: "CRIT", color: "#e1614b", bg: "rgba(225,97,75,0.12)" },
-  high:     { label: "HIGH", color: "#e8a33d", bg: "rgba(232,163,61,0.12)" },
-  medium:   { label: "MED",  color: "#6fbf8b", bg: "rgba(111,191,139,0.12)" },
-  low:      { label: "LOW",  color: "#9498b0", bg: "rgba(148,152,176,0.12)" },
+  critical: { label: "CRIT", color: "var(--red)", bg: "color-mix(in srgb, var(--red) 12%, transparent)" },
+  high:     { label: "HIGH", color: "var(--amber)", bg: "color-mix(in srgb, var(--amber) 12%, transparent)" },
+  medium:   { label: "MED",  color: "var(--green)", bg: "color-mix(in srgb, var(--green) 12%, transparent)" },
+  low:      { label: "LOW",  color: "var(--text-dim)", bg: "color-mix(in srgb, var(--text-dim) 12%, transparent)" },
 };
-
-const AMBIENT_TRACKS = [
-  { id: "rain", label: "Rain", icon: "~~" },
-  { id: "forest", label: "Forest", icon: "//" },
-  { id: "cafe", label: "Cafe", icon: "oo" },
-  { id: "waves", label: "Waves", icon: "~~" },
-];
-
-
 
 /* -- Format stopwatch as HH:MM:SS -- */
 function fmtStopwatch(ms: number): string {
@@ -41,201 +40,46 @@ function fmtStopwatch(ms: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/* ================================================================
-   AMBIENT SOUND SYNTHESIZER
-   Generates synthetic ambient textures via Web Audio API.
-   Each track type produces a distinct noise profile:
-     rain   -- filtered white noise with occasional drip tones
-     forest -- low brownian noise with random chirp tones
-     cafe   -- bandpass-filtered noise with murmur texture
-     waves  -- slow-oscillating low-pass filtered noise
-   ================================================================ */
-
-interface AmbientNode {
-  gain: GainNode;
-  stop: () => void;
-}
-
-const ambientNodesRef = new Map<string, AmbientNode>();
-
-function createAmbientSource(type: string, ac: AudioContext, masterGain: GainNode): AmbientNode {
-  const gain = ac.createGain();
-  gain.gain.value = 0;
-  gain.connect(masterGain);
-
-  const bufferSize = ac.sampleRate * 4;
-  const buffer = ac.createBuffer(2, bufferSize, ac.sampleRate);
-
-  // Fill with noise
-  for (let ch = 0; ch < 2; ch++) {
-    const data = buffer.getChannelData(ch);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-  }
-
-  const source = ac.createBufferSource();
-  source.buffer = buffer;
-  source.loop = true;
-
-  let filters: BiquadFilterNode[] = [];
-  let lfoOsc: OscillatorNode | null = null;
-  let lfoGain: GainNode | null = null;
-  let intervalId: ReturnType<typeof setInterval> | null = null;
-
-  switch (type) {
-    case "rain": {
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = 3000;
-      lp.Q.value = 0.5;
-      const hp = ac.createBiquadFilter();
-      hp.type = "highpass";
-      hp.frequency.value = 400;
-      hp.Q.value = 0.3;
-      source.connect(lp).connect(hp).connect(gain);
-      filters = [lp, hp];
-      // Random drip tones
-      intervalId = setInterval(() => {
-        if (ac.state === "closed") return;
-        const osc = ac.createOscillator();
-        const g = ac.createGain();
-        osc.type = "sine";
-        osc.frequency.value = 800 + Math.random() * 2000;
-        g.gain.setValueAtTime(0, ac.currentTime);
-        g.gain.linearRampToValueAtTime(0.03, ac.currentTime + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
-        osc.connect(g).connect(gain);
-        osc.start(ac.currentTime);
-        osc.stop(ac.currentTime + 0.15);
-      }, 300 + Math.random() * 600);
-      break;
-    }
-    case "forest": {
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = 1200;
-      lp.Q.value = 1;
-      source.connect(lp).connect(gain);
-      filters = [lp];
-      // Random chirps
-      intervalId = setInterval(() => {
-        if (ac.state === "closed") return;
-        const osc = ac.createOscillator();
-        const g = ac.createGain();
-        osc.type = "sine";
-        osc.frequency.value = 2000 + Math.random() * 3000;
-        g.gain.setValueAtTime(0, ac.currentTime);
-        g.gain.linearRampToValueAtTime(0.02, ac.currentTime + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
-        osc.connect(g).connect(gain);
-        osc.start(ac.currentTime);
-        osc.stop(ac.currentTime + 0.1);
-      }, 1500 + Math.random() * 3000);
-      break;
-    }
-    case "cafe": {
-      const bp = ac.createBiquadFilter();
-      bp.type = "bandpass";
-      bp.frequency.value = 800;
-      bp.Q.value = 0.8;
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = 2000;
-      source.connect(bp).connect(lp).connect(gain);
-      filters = [bp, lp];
-      break;
-    }
-    case "waves": {
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = 600;
-      lp.Q.value = 0.7;
-      source.connect(lp).connect(gain);
-      filters = [lp];
-      // Slow LFO modulating the filter frequency
-      lfoOsc = ac.createOscillator();
-      lfoGain = ac.createGain();
-      lfoOsc.type = "sine";
-      lfoOsc.frequency.value = 0.1; // 10 second cycle
-      lfoGain.gain.value = 400;
-      lfoOsc.connect(lfoGain).connect(lp.frequency);
-      lfoOsc.start();
-      break;
-    }
-    default: {
-      source.connect(gain);
-      break;
-    }
-  }
-
-  source.start();
-
-  const stop = () => {
-    try {
-      source.stop();
-      source.disconnect();
-      lfoOsc?.stop();
-      lfoOsc?.disconnect();
-      lfoGain?.disconnect();
-      filters.forEach((f) => f.disconnect());
-      gain.disconnect();
-      if (intervalId !== null) clearInterval(intervalId);
-    } catch { /* already stopped */ }
-  };
-
-  return { gain, stop };
-}
-
-function startAmbient(id: string, volume01: number) {
-  let ac: AudioContext;
-  try {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    ac = new Ctx();
-    if (ac.state === "suspended") ac.resume();
-  } catch { return; }
-
-  const masterGain = ac.createGain();
-  masterGain.gain.value = volume01;
-  masterGain.connect(ac.destination);
-
-  const node = createAmbientSource(id, ac, masterGain);
-  ambientNodesRef.set(id, { ...node, gain: node.gain });
-  // Store ac reference on the node for volume updates
-  (node as unknown as { _ac?: AudioContext })._ac = ac;
-  (node as unknown as { _masterGain?: GainNode })._masterGain = masterGain;
-}
-
-function stopAmbient(id: string) {
-  const node = ambientNodesRef.get(id);
-  if (node) {
-    node.stop();
-    ambientNodesRef.delete(id);
-  }
-}
-
-function setAmbientVolume(id: string, volume01: number) {
-  const node = ambientNodesRef.get(id);
-  if (node) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const masterGain = (node as any)._masterGain as GainNode | undefined;
-    if (masterGain) masterGain.gain.value = volume01;
-  }
-}
-
-/* -- Equalizer bars (3-bar animated) -- */
-function Equalizer({ active }: { active: boolean }) {
+/* -- Waveform indicator -- */
+function WaveIndicator({ active, color }: { active: boolean; color: string }) {
   return (
-    <div className="b-eq">
-      {[0.6, 1, 0.75].map((h, i) => (
-        <motion.div
+    <svg width="16" height="16" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <motion.rect
           key={i}
-          className="b-eq-bar"
-          animate={active ? { scaleY: [0.3, h, 0.5, h * 0.8, 0.3] } : { scaleY: 0.15 }}
-          transition={active ? { duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" } : { duration: 0.3 }}
+          x={i * 3.5}
+          rx={1}
+          width={2.5}
+          fill={active ? color : "var(--text-dim)"}
+          animate={
+            active
+              ? {
+                  y: [4 + Math.sin(i) * 2, 2, 6, 1 + Math.cos(i) * 2, 4 + Math.sin(i) * 2],
+                  height: [6, 10, 4, 11, 6],
+                }
+              : { y: 5.5, height: 3 }
+          }
+          transition={
+            active
+              ? { duration: 1 + i * 0.12, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 0.3 }
+          }
         />
       ))}
-    </div>
+    </svg>
+  );
+}
+
+/* -- Animated wave ring indicator for active frequency -- */
+function ActiveRing({ color, active }: { color: string; active: boolean }) {
+  if (!active) return null;
+  return (
+    <motion.div
+      className="b-freq-ring"
+      style={{ borderColor: color }}
+      animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.08, 1] }}
+      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+    />
   );
 }
 
@@ -283,53 +127,39 @@ export default function FocusView() {
   const setData = useSetData();
   const timer = useTimerContext();
   const safeLongBreakInterval = Number.isFinite(settings.longBreakInterval) && settings.longBreakInterval > 0 ? settings.longBreakInterval : 4;
-  const safeShortBreak = Number.isFinite(settings.shortBreak) && settings.shortBreak > 0 ? settings.shortBreak : 5;
-  const safeLongBreak = Number.isFinite(settings.longBreak) && settings.longBreak > 0 ? settings.longBreak : 15;
   const today = useMemo(() => todayStr(), []);
   const todaySessions = useMemo(() => sessions.filter((s) => s.date === today), [sessions, today]);
-  // Live focused minutes = completed sessions today + current session elapsed
   const completedTodayMin = useMemo(() => todaySessions.reduce((a, s) => a + s.minutes, 0), [todaySessions]);
   const liveSessionMin = timer.phase === "work" && timer.running ? Math.floor(timer.sessionFocusMs / 60000) : 0;
   const focusedMin = completedTodayMin + liveSessionMin;
   const subject = useMemo(() => subjects.find((s) => s.id === timer.subjectId), [subjects, timer.subjectId]);
   const incompleteTasks = useMemo(() => tasks.filter((t) => t.status !== "done"), [tasks]);
 
-  // Session counter
   const mode = timer._getMode();
-  const pomBlocks = useMemo(() => Math.min(todaySessions.length, 8), [todaySessions]);
-  const sessionNum = todaySessions.length + (timer.running && timer.phase === "work" ? 1 : 0);
-  const targetSessions = mode.label === "Custom" ? 4 : mode.label === "Pomodoro" ? safeLongBreakInterval : 2;
+  const pomBlocks = timer.sessionCount;
+  const sessionNum = timer.sessionCount + (timer.running && timer.phase === "work" ? 1 : 0);
 
-  // Determine if this should be a long break (after longBreakInterval sessions)
   const isLongBreak = useMemo(() => {
     if (timer.phase === "work") return false;
     if (mode.label === "Long session") return true;
     return todaySessions.length > 0 && todaySessions.length % safeLongBreakInterval === 0;
   }, [timer.phase, mode.label, todaySessions.length, safeLongBreakInterval]);
 
-  // Effective break duration (long break after N sessions)
-  const effectiveBreak = isLongBreak ? safeLongBreak : safeShortBreak;
+  const effectiveBreak = isLongBreak ? timer.longBreakDuration : timer.shortBreakDuration;
 
-  // Subtasks for active subject
+  const nextSessionCount = timer.sessionCount + 1;
+  const nextIsLongBreak = nextSessionCount > 0 && nextSessionCount % safeLongBreakInterval === 0;
+  const nextBreakDur = nextIsLongBreak ? timer.longBreakDuration * 60 : timer.shortBreakDuration * 60;
+
   const activeTasks = useMemo(
     () => incompleteTasks.filter((t) => !timer.subjectId || t.subjectId === timer.subjectId).slice(0, 6),
     [incompleteTasks, timer.subjectId]
   );
 
-  // Analytics — live totals include current in-progress session
   const completedAllMin = useMemo(() => sessions.reduce((a, s) => a + s.minutes, 0), [sessions]);
   const liveTotalMin = Math.floor(timer.totalFocusMs / 60000);
   const totalFocusHrs = ((completedAllMin + liveTotalMin) / 60).toFixed(1);
-  const streak = useMemo(() => {
-    let s = 0;
-    for (let i = 0; ; i++) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
-      if (sessions.some((sess) => sess.date === ds)) s++; else break;
-      if (i > 365) break;
-    }
-    return s;
-  }, [sessions]);
+  const { streak, streakActive } = useMemo(() => computeStreak(sessions), [sessions]);
   const efficiency = useMemo(() => {
     if (!sessions.length) return 0;
     const totalPlanned = sessions.length * mode.work;
@@ -347,44 +177,48 @@ export default function FocusView() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  const prevModeKeyRef = useRef(timer.modeKey);
+  const prevCustomWorkRef = useRef(timer.customWork);
+  const prevCustomRestRef = useRef(timer.customRest);
+
+
+
   useEffect(() => {
-    const unregister = timer.onTimerComplete(() => {
-      const m = getModeRef.current!();
-      const s = settingsRef.current;
-      if (timer.phase === "work") {
-        setDataRef.current((d) => ({
-          ...d,
-          sessions: [...d.sessions, { id: uid(), date: todayRef.current, startTime: new Date().toISOString(), subjectId: subjectIdRef.current, minutes: m.work, mode: m.label, subtasksCompleted: 0, distractionTags: [] }],
-        }));
-        timer.setPhase("rest");
-        timer.reset(m.rest * 60);
-        if (s.autoStartBreak) {
-          queueMicrotask(() => timer.start());
-        }
+    const modeKeyChanged = prevModeKeyRef.current !== timer.modeKey;
+    const customChanged = prevCustomWorkRef.current !== timer.customWork || prevCustomRestRef.current !== timer.customRest;
+    const shouldReset = !timer.running && (modeKeyChanged || customChanged);
+
+    if (shouldReset) {
+      let dur: number;
+      if (timer.modeKey === "custom") {
+        dur = (timer.phase === "work" ? timer.customWork : timer.customRest) * 60;
       } else {
-        timer.setPhase("work");
-        timer.reset(m.work * 60);
-        if (s.autoStartFocus) {
-          queueMicrotask(() => timer.start());
-        }
+        const m = timer._getMode();
+        dur = timer.phase === "work"
+          ? m.work * 60
+          : effectiveBreak * 60;
       }
-    });
-    return unregister;
-  }, [timer.onTimerComplete, timer.setPhase, timer.reset, timer.start, timer.phase]);
-
-  useEffect(() => {
-    if (timer.modeKey !== "custom" && !timer.running) {
-      const m = timer._getMode();
-      timer.reset((timer.phase === "work" ? m.work : m.rest) * 60);
-    }
-  }, [timer.modeKey, timer.running, timer.reset, timer.phase, timer._getMode]);
-
-  useEffect(() => {
-    if (timer.modeKey === "custom" && !timer.running) {
-      const dur = (timer.phase === "work" ? timer.customWork : timer.customRest) * 60;
       timer.reset(dur);
     }
-  }, [timer.customWork, timer.customRest, timer.modeKey, timer.running, timer.phase, timer.reset]);
+
+    prevModeKeyRef.current = timer.modeKey;
+    prevCustomWorkRef.current = timer.customWork;
+    prevCustomRestRef.current = timer.customRest;
+  }, [timer.modeKey, timer.running, timer.reset, timer.phase, timer._getMode, timer.customWork, timer.customRest, effectiveBreak]);
+
+  useEffect(() => {
+    if (Number.isFinite(settings.shortBreak) && settings.shortBreak > 0 && settings.shortBreak !== timer.shortBreakDuration) {
+      timer.setShortBreakDuration(settings.shortBreak);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.shortBreak]);
+
+  useEffect(() => {
+    if (Number.isFinite(settings.longBreak) && settings.longBreak > 0 && settings.longBreak !== timer.longBreakDuration) {
+      timer.setLongBreakDuration(settings.longBreak);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.longBreak]);
 
   // -- Handlers --
   const handlePlayPause = useCallback(() => {
@@ -402,19 +236,62 @@ export default function FocusView() {
     timer.pause();
     if (timer.phase === "work") {
       timer.setPhase("rest");
-      const m = timer._getMode();
-      timer.reset(m.rest * 60);
+      timer.reset(effectiveBreak * 60);
     } else {
       timer.setPhase("work");
       const m = timer._getMode();
       timer.reset(m.work * 60);
     }
-  }, [timer.pause, timer.setPhase, timer.reset, timer.phase, timer._getMode]);
+  }, [timer.pause, timer.setPhase, timer.reset, timer.phase, timer._getMode, timer.modeKey, effectiveBreak]);
+
+  // -- Mode-switch confirmation popover --
+  const [confirmModePopover, setConfirmModePopover] = useState(false);
+  const [pendingModeKey, setPendingModeKey] = useState<string | null>(null);
 
   const handleMode = useCallback((key: string) => {
-    if (timer.running) timer.pause();
-    timer.setModeKey(key);
-  }, [timer.running, timer.pause, timer.setModeKey]);
+    if (key === timer.modeKey) return;
+    if (timer.running) {
+      setPendingModeKey(key);
+      setConfirmModePopover(true);
+    } else {
+      timer.setModeKey(key);
+    }
+  }, [timer.running, timer.modeKey, timer.setModeKey]);
+
+  const confirmModeSwitch = useCallback(() => {
+    if (pendingModeKey) {
+      if (timer.phase === "work" && timer.running && timer.sessionFocusMs > 0) {
+        const elapsedMin = Math.max(1, Math.round(timer.sessionFocusMs / 60000));
+        setData((d) => ({
+          ...d,
+          sessions: [
+            ...d.sessions,
+            {
+              id: uid(),
+              date: today,
+              startTime: new Date().toISOString(),
+              subjectId: timer.subjectId,
+              minutes: elapsedMin,
+              mode: mode.label,
+              subtasksCompleted: 0,
+              distractionTags: [],
+            },
+          ],
+        }));
+      }
+      timer.setSessionCount(timer.sessionCount + (timer.phase === "work" ? 1 : 0));
+      timer.pause();
+      timer.setPhase("work");
+      timer.setModeKey(pendingModeKey);
+    }
+    setPendingModeKey(null);
+    setConfirmModePopover(false);
+  }, [pendingModeKey, timer, mode.label, setData, today]);
+
+  const dismissModeSwitch = useCallback(() => {
+    setPendingModeKey(null);
+    setConfirmModePopover(false);
+  }, []);
 
   const toggleTask = useCallback((id: string) => {
     setData((d) => ({
@@ -453,67 +330,68 @@ export default function FocusView() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // -- Keyboard hotkeys (Space, R, S) from settings --
+  // -- Keyboard hotkeys --
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ignore if typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
       const key = e.key;
       if (key === settings.hotkeyPlayPause || key === " ") {
-        e.preventDefault();
-        handlePlayPause();
+        e.preventDefault(); handlePlayPause();
       } else if (key === settings.hotkeyReset || key === "r" || key === "R") {
-        e.preventDefault();
-        handleReset();
+        e.preventDefault(); handleReset();
       } else if (key === settings.hotkeySkip || key === "s" || key === "S") {
-        e.preventDefault();
-        handleSkip();
+        e.preventDefault(); handleSkip();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [settings.hotkeyPlayPause, settings.hotkeyReset, settings.hotkeySkip, handlePlayPause, handleReset, handleSkip]);
 
-  // -- Ambient audio state --
-  const [activeAmbient, setActiveAmbient] = useState<Set<string>>(new Set());
-  const [volume, setVolume] = useState(settings.audioVolume);
-  const toggleAmbient = useCallback((id: string) => {
-    setActiveAmbient((prev) => {
+  // ── Focus Frequencies state ──
+  const [activeFreqs, setActiveFreqs] = useState<Set<string>>(new Set());
+  const [volume, setVolumeState] = useState(settings.audioVolume);
+
+  const setVolume = useCallback((v: number) => {
+    setVolumeState(v);
+    setData((d) => ({ ...d, settings: { ...d.settings, audioVolume: v } }));
+  }, [setData]);
+
+  const toggleFrequency = useCallback((id: string) => {
+    setActiveFreqs((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        stopAmbient(id);
+        stopFrequency(id);
       } else {
         next.add(id);
-        startAmbient(id, volume / 100);
+        startFrequency(id, volume / 100);
       }
       return next;
     });
   }, [volume]);
 
-  // Sync volume to active ambient sources
+  // Sync volume to active frequencies
   useEffect(() => {
-    for (const id of activeAmbient) {
-      setAmbientVolume(id, volume / 100);
+    for (const id of activeFreqs) {
+      setFrequencyVolume(id, volume / 100);
     }
-  }, [volume, activeAmbient]);
+  }, [volume, activeFreqs]);
 
-  // Cleanup ambient on unmount
+  // Cleanup frequencies on unmount
   useEffect(() => {
     return () => {
-      for (const id of ambientNodesRef.keys()) {
-        stopAmbient(id);
+      for (const id of activeFreqs) {
+        stopFrequency(id);
       }
     };
   }, []);
 
   // -- Timer geometry --
-  const totalSeconds = (timer.phase === "work" ? mode.work : mode.rest) * 60;
+  const totalSeconds = timer.phase === "work" ? mode.work * 60 : effectiveBreak * 60;
 
   const phaseLabel = timer.phase === "work" ? "FOCUS SESSION" : isLongBreak ? "LONG BREAK" : "SHORT BREAK";
-  const accentColor = timer.phase === "work" ? "#e8a33d" : "#6fbf8b";
+  const accentColor = timer.phase === "work" ? "var(--amber)" : "var(--green)";
 
   return (
     <div className="b-root">
@@ -521,8 +399,8 @@ export default function FocusView() {
       <aside className="b-sidebar">
         <div className="b-sidebar-section" style={{ marginTop: 0 }}>
           <div className="b-sidebar-label">SESSION PROGRESS</div>
-          <PomBlocks count={pomBlocks} max={safeLongBreakInterval} />
-          <div className="b-sidebar-hint">{pomBlocks} of {safeLongBreakInterval} blocks today</div>
+          <PomBlocks count={pomBlocks} max={Math.max(pomBlocks, safeLongBreakInterval)} />
+          <div className="b-sidebar-hint">{pomBlocks} of {Math.max(pomBlocks, safeLongBreakInterval)} blocks today</div>
         </div>
 
         <div className="b-sidebar-section">
@@ -599,7 +477,6 @@ export default function FocusView() {
               phase={timer.phase}
               isRunning={timer.running}
               sessionNum={sessionNum}
-              targetSessions={targetSessions}
               focusMin={mode.work}
               breakMin={effectiveBreak}
               accentColor={accentColor}
@@ -609,6 +486,16 @@ export default function FocusView() {
               onReset={handleReset}
               onSkip={handleSkip}
               phaseLabel={phaseLabel}
+              longBreakMin={timer.longBreakDuration}
+              onEditWorkDuration={timer.setWorkDuration}
+              onEditShortBreak={(min) => {
+                timer.setShortBreakDuration(min);
+                setData((d) => ({ ...d, settings: { ...d.settings, shortBreak: min } }));
+              }}
+              onEditLongBreak={(min) => {
+                timer.setLongBreakDuration(min);
+                setData((d) => ({ ...d, settings: { ...d.settings, longBreak: min } }));
+              }}
             />
           </div>
 
@@ -622,7 +509,6 @@ export default function FocusView() {
                 <span className="b-panel-count">{incompleteTasks.length}</span>
               </div>
 
-              {/* Quick input */}
               <div className="b-quick-input-wrap">
                 <input
                   ref={inputRef}
@@ -645,7 +531,7 @@ export default function FocusView() {
                       <div className="b-task-body">
                         <div className="b-task-title">{task.title}</div>
                         <div className="b-task-meta">
-                          {subj && <span className="b-tag" style={{ color: subj.color, background: `${subj.color}18` }}>{subj.name}</span>}
+                          {subj && <span className="b-tag" style={{ color: subj.color, background: `color-mix(in srgb, ${subj.color} 10%, transparent)` }}>{subj.name}</span>}
                           <span className="b-tag" style={{ color: prio.color, background: prio.bg }}>{prio.label}</span>
                           <span className="b-task-est">{task.estMin}m</span>
                         </div>
@@ -657,24 +543,40 @@ export default function FocusView() {
               </div>
             </div>
 
-            {/* -- Ambient Audio -- */}
+            {/* -- Focus Frequencies & Binaural Noise -- */}
             <div className="b-panel">
               <div className="b-panel-header">
-                <span className="b-panel-title"><Volume2 size={13} /> AMBIENT</span>
+                <span className="b-panel-title"><Volume2 size={13} /> FOCUS FREQUENCIES</span>
               </div>
               <div className="b-audio-grid">
-                {AMBIENT_TRACKS.map((track) => {
-                  const active = activeAmbient.has(track.id);
+                {FOCUS_FREQUENCIES.map((freq) => {
+                  const active = activeFreqs.has(freq.id);
                   return (
                     <motion.button
-                      key={track.id}
+                      key={freq.id}
                       className={`b-audio-card ${active ? "b-audio-card-active" : ""}`}
-                      onClick={() => toggleAmbient(track.id)}
+                      onClick={() => toggleFrequency(freq.id)}
                       whileTap={{ scale: 0.95 }}
+                      style={active ? { borderColor: freq.color, background: `color-mix(in srgb, ${freq.color} 8%, transparent)` } : {}}
                     >
-                      <span className="b-audio-icon">{track.icon}</span>
-                      <span className="b-audio-label">{track.label}</span>
-                      <Equalizer active={active} />
+                      <ActiveRing color={freq.color} active={active} />
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center" }}>
+                        <WaveIndicator active={active} color={freq.color} />
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+                          <span className="b-audio-label">{freq.shortLabel}</span>
+                          <span style={{ fontSize: 9, color: "var(--text-dim)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                            {freq.description}
+                          </span>
+                        </div>
+                      </div>
+                      {active && (
+                        <motion.div
+                          className="b-freq-active-dot"
+                          style={{ background: freq.color }}
+                          animate={{ scale: [1, 1.4, 1], opacity: [0.7, 1, 0.7] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        />
+                      )}
                     </motion.button>
                   );
                 })}
@@ -699,22 +601,22 @@ export default function FocusView() {
                 <span className="b-panel-title"><BarChart3 size={13} /> TODAY</span>
               </div>
               <div className="b-analytics-grid">
-                <div className="b-analytics-item">
-                  <Flame size={14} style={{ color: "#e1614b" }} />
+                <div className={`b-analytics-item b-streak-wrap ${streakActive ? "b-streak-active" : "b-streak-dimmed"}`}>
+                  <Flame size={14} className={`b-streak-flame ${streakActive ? "b-streak-flame-active" : "b-streak-flame-dimmed"}`} />
                   <div>
                     <div className="b-analytics-val">{streak}</div>
                     <div className="b-analytics-label">Day Streak</div>
                   </div>
                 </div>
                 <div className="b-analytics-item">
-                  <Clock size={14} style={{ color: "#e8a33d" }} />
+                  <Clock size={14} style={{ color: "var(--amber)" }} />
                   <div>
                     <div className="b-analytics-val">{totalFocusHrs}h</div>
                     <div className="b-analytics-label">Total Focus</div>
                   </div>
                 </div>
                 <div className="b-analytics-item">
-                  <Zap size={14} style={{ color: "#6fbf8b" }} />
+                  <Zap size={14} style={{ color: "var(--green)" }} />
                   <div>
                     <div className="b-analytics-val">{efficiency}%</div>
                     <div className="b-analytics-label">Efficiency</div>
@@ -726,6 +628,95 @@ export default function FocusView() {
           </div>
         </div>
       </main>
+
+      {/* -- Mode-switch confirmation popover -- */}
+      <AnimatePresence>
+        {confirmModePopover && (
+          <motion.div
+            className="b-popover-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={dismissModeSwitch}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "color-mix(in srgb, #000 45%, transparent)",
+            }}
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.92, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 6 }}
+              transition={{ type: "spring", stiffness: 400, damping: 24 }}
+              style={{
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                borderRadius: 14,
+                padding: "24px 28px",
+                maxWidth: 320,
+                width: "90%",
+                textAlign: "center",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>
+                Switch focus mode?
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 20, lineHeight: 1.5 }}>
+                Timer is running. Switching will reset the current countdown.
+                {timer.phase === "work" && (
+                  <span style={{ display: "block", marginTop: 4, color: "var(--amber)" }}>
+                    Your focus time so far will be saved.
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <motion.button
+                  onClick={dismissModeSwitch}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.94 }}
+                  style={{
+                    padding: "8px 18px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text-dim)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  onClick={confirmModeSwitch}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.94 }}
+                  style={{
+                    padding: "8px 18px",
+                    borderRadius: 8,
+                    border: "1px solid var(--amber)",
+                    background: "color-mix(in srgb, var(--amber) 12%, transparent)",
+                    color: "var(--amber)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Confirm
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
