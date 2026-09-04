@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Plus, Trash2, Check } from "lucide-react";
+import { BookOpen, Plus, Trash2, Check, Pencil } from "lucide-react";
 import { PALETTE, MASTERY_LABELS, uid, fmtMin } from "@/lib/utils";
 import { useStudyStore } from "@/lib/store";
 
@@ -17,6 +17,8 @@ export default function SubjectsView() {
   const [name, setName] = useState("");
   const [addingTopicFor, setAddingTopicFor] = useState<string | null>(null);
   const [topicName, setTopicName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
   const addPending = useRef(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -60,6 +62,21 @@ export default function SubjectsView() {
     (id: string) => setData((d) => ({ ...d, subjects: d.subjects.filter((s) => s.id !== id) })),
     [setData]
   );
+
+  const startRenameSubject = useCallback((s: { id: string; name: string }) => {
+    setRenamingId(s.id);
+    setRenameName(s.name);
+  }, []);
+
+  const commitRenameSubject = useCallback(() => {
+    if (renamingId && renameName.trim()) {
+      setData((d) => ({
+        ...d,
+        subjects: d.subjects.map((s) => (s.id === renamingId ? { ...s, name: renameName.trim() } : s)),
+      }));
+    }
+    setRenamingId(null);
+  }, [renamingId, renameName, setData]);
 
   const addTopic = useCallback((id: string) => {
     if (addingTopicFor === id) {
@@ -133,11 +150,30 @@ export default function SubjectsView() {
               <div className="b-subjects-card-header">
                 <div className="b-subjects-card-title-row">
                   <div className="b-subjects-card-dot" style={{ background: s.color }} />
-                  <span className="b-subjects-card-name">{s.name}</span>
+                  {renamingId === s.id ? (
+                    <input
+                      className="b-subjects-rename-input"
+                      value={renameName}
+                      onChange={(e) => setRenameName(e.target.value)}
+                      onBlur={commitRenameSubject}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRenameSubject();
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="b-subjects-card-name">{s.name}</span>
+                  )}
                 </div>
-                <motion.button className="b-subjects-card-delete" onClick={() => removeSubject(s.id)} whileTap={{ scale: 0.8 }}>
-                  <Trash2 size={11} />
-                </motion.button>
+                <div className="b-subjects-card-actions">
+                  <motion.button className="b-subjects-card-edit" onClick={() => startRenameSubject(s)} whileTap={{ scale: 0.8 }}>
+                    <Pencil size={11} />
+                  </motion.button>
+                  <motion.button className="b-subjects-card-delete" onClick={() => removeSubject(s.id)} whileTap={{ scale: 0.8 }}>
+                    <Trash2 size={11} />
+                  </motion.button>
+                </div>
               </div>
 
               {/* Stats row */}

@@ -182,8 +182,12 @@ self.onmessage = (ev: MessageEvent) => {
       stopwatchStartMs = msg.stopwatchStartMs || 0;
       pausedStopwatchMs = msg.pausedStopwatchMs || 0;
 
-      // Reset session accumulator (fresh session on each start)
-      sessionFrozenMs = 0;
+      // Restore the session accumulator from the main thread — do NOT zero it.
+      // "start" is also used to re-kick an already-running timer (visibility
+      // change, leader takeover); zeroing here makes the worker's value fight
+      // the main thread's accumulated value and the dashboard's minute counter
+      // flickers (0 min ↔ 1 min).
+      sessionFrozenMs = msg.sessionFocusMs || 0;
       sessionStartMs = 0;
       // Preserve total accumulator
       totalFrozenMs = msg.totalFocusMs || totalFrozenMs;

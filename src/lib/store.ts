@@ -1,13 +1,19 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { StudyData, Session } from "@/types/studyos";
-import { loadStudyDataSync, loadStudyData, saveStudyData, flushStorage } from "@/lib/storage";
+import { loadStudyDataSync, loadStudyData, saveStudyData, flushStorage, setStorageScope } from "@/lib/storage";
+import { signOutUser, type AuthUser } from "@/lib/supabase";
 import { defaultData, todayStr } from "@/lib/utils";
 
 interface StudyStore {
   data: StudyData;
   loaded: boolean;
+  user: AuthUser | null;
+  authReady: boolean;
   setData: (action: StudyData | ((prev: StudyData) => StudyData)) => void;
+  /** Sync the authenticated user. Changing user swaps the storage scope and reloads that user's data. */
+  setAuthUser: (user: AuthUser | null) => void;
+  signOut: () => Promise<void>;
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -33,6 +39,8 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     settings: lightData?.settings ?? defaults.settings,
   },
   loaded: false,
+  user: null,
+  authReady: false,
 
   setData: (action) => {
     set((state) => ({
@@ -40,6 +48,34 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     }));
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => saveStudyData(get().data), 400);
+  },
+
+  setAuthUser: (user) => {
+    const prev = get().user;
+    const sameScope = (prev?.id ?? null) === (user?.id ?? null);
+    if (sameScope) {
+      // Same account (or both signed out) — no data swap, just sync the user.
+      set({ user, authReady: true });
+      return;
+    }
+    // Account changed — flush the outgoing scope's pending writes, switch
+    // storage keys, then reload the new scope's data.
+    flushStorage(get().data);
+    set({ user, authReady: true, loaded: false });
+    setStorageScope(user?.id ?? null);
+    loadStudyData()
+      .then((full) => {
+        const normalized = { ...full, habits: normalizeHabits(full.habits) };
+        useStudyStore.setState({ data: normalized, loaded: true });
+      })
+      .catch(() => useStudyStore.setState({ loaded: true }));
+  },
+
+  signOut: async () => {
+    try {
+      await signOutUser();
+    } catch { /* ignore — still drop the local session */ }
+    get().setAuthUser(null);
   },
 }));
 
@@ -89,6 +125,9 @@ export const useSessions = () => useStudyStore((s) => s.data?.sessions ?? EMPTY_
 export const useSettings = () => useStudyStore((s) => s.data?.settings ?? EMPTY_SETTINGS);
 export const useLoaded = () => useStudyStore((s) => s.loaded);
 export const useSetData = () => useStudyStore((s) => s.setData);
+export const useUser = () => useStudyStore((s) => s.user);
+export const useAuthReady = () => useStudyStore((s) => s.authReady);
+export const useSignOut = () => useStudyStore((s) => s.signOut);
 
 /* ── Compound selectors – wrapped with useShallow for referential stability ── */
 export const useTaskData = () => useStudyStore(

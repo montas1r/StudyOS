@@ -14,6 +14,7 @@ import {
   Search,
   X,
   Clock,
+  Pencil,
 } from "lucide-react";
 import type { Priority, TaskStatus, TaskCategory, Task } from "@/types/studyos";
 import { PRIORITIES, TASK_STATUSES, uid, fmtMin } from "@/lib/utils";
@@ -68,6 +69,8 @@ export default function TasksView() {
   const [editingTitle, setEditingTitle] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // Bumped on each "Add subtask" click so the inline input re-opens even for the same task
+  const [subtaskFocusSignal, setSubtaskFocusSignal] = useState<{ taskId: string; n: number } | null>(null);
 
   // Quick-add state per column (kanban)
   const [quickAddCol, setQuickAddCol] = useState<string | null>(null);
@@ -224,6 +227,15 @@ export default function TasksView() {
       else next.add(id);
       return next;
     });
+  }, []);
+
+  const handleAddSubtask = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setSubtaskFocusSignal((prev) => ({ taskId: id, n: (prev?.n ?? 0) + 1 }));
   }, []);
 
   const startEditTitle = useCallback((task: Task) => {
@@ -486,11 +498,9 @@ export default function TasksView() {
 
                   {/* Expand toggle */}
                   <div className="b-tasks-cell b-tasks-cell-expand">
-                    {hasSubtasks && (
-                      <button className="b-tasks-expand-btn" onClick={() => toggleExpand(t.id)}>
-                        {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                      </button>
-                    )}
+                    <button className="b-tasks-expand-btn" onClick={() => toggleExpand(t.id)}>
+                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    </button>
                   </div>
 
                   {/* Title */}
@@ -597,6 +607,20 @@ export default function TasksView() {
 
                   {/* Actions */}
                   <div className="b-tasks-cell b-tasks-cell-actions">
+                    <button
+                      className="b-tasks-action-btn b-tasks-action-btn-accent"
+                      title="Add subtask"
+                      onClick={() => handleAddSubtask(t.id)}
+                    >
+                      <Plus size={12} />
+                    </button>
+                    <button
+                      className="b-tasks-action-btn b-tasks-action-btn-accent"
+                      title="Rename task"
+                      onClick={() => startEditTitle(t)}
+                    >
+                      <Pencil size={12} />
+                    </button>
                     <button className="b-tasks-action-btn" onClick={() => removeTask(t.id)}>
                       <Trash2 size={12} />
                     </button>
@@ -604,7 +628,7 @@ export default function TasksView() {
                 </div>
 
                 {/* Expanded subtasks */}
-                {hasSubtasks && isExpanded && (
+                {isExpanded && (
                   <div className="b-tasks-subtree">
                     {t.subtasks.map((st) => (
                       <div key={st.id} className="b-tasks-subtask-row">
@@ -627,7 +651,11 @@ export default function TasksView() {
                       <div className="b-tasks-cell b-tasks-cell-check" />
                       <div className="b-tasks-cell b-tasks-cell-expand" />
                       <div className="b-tasks-cell b-tasks-cell-title b-tasks-subtask-indent">
-                        <SubtaskAddInline taskId={t.id} onAdd={addSubtask} />
+                        <SubtaskAddInline
+                          taskId={t.id}
+                          onAdd={addSubtask}
+                          focusSignal={subtaskFocusSignal?.taskId === t.id ? subtaskFocusSignal.n : 0}
+                        />
                       </div>
                     </div>
                   </div>
@@ -899,9 +927,21 @@ export default function TasksView() {
 }
 
 // ── Inline subtask add ──
-function SubtaskAddInline({ taskId, onAdd }: { taskId: string; onAdd: (taskId: string, title: string) => void }) {
+function SubtaskAddInline({
+  taskId,
+  onAdd,
+  focusSignal = 0,
+}: {
+  taskId: string;
+  onAdd: (taskId: string, title: string) => void;
+  focusSignal?: number;
+}) {
   const [val, setVal] = useState("");
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (focusSignal > 0) setOpen(true);
+  }, [focusSignal]);
 
   if (!open) {
     return (

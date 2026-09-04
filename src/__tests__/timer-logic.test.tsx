@@ -152,6 +152,7 @@ interface MockTimer {
   lap: Mock;
   resetStopwatch: Mock;
   resetSession: Mock;
+  commitFocusMinutes: Mock;
   _getMode: Mock;
 }
 
@@ -222,6 +223,7 @@ function buildMockTimer(overrides: Partial<MockTimer> = {}): MockTimer {
     lap: vi.fn(),
     resetStopwatch: vi.fn(),
     resetSession: vi.fn(),
+    commitFocusMinutes: vi.fn(() => 0),
     _getMode: vi.fn(() => FOCUS_MODES.pomodoro),
     ...overrides,
   };
@@ -645,31 +647,22 @@ describe("Mode-switch confirmation popover", () => {
     }
   });
 
-  it("Confirm commits accumulated focus time to store when in work phase", () => {
-    const initialSessions: MockSession[] = [];
-    renderFocusView(
-      {
-        running: true,
-        modeKey: "pomodoro",
-        phase: "work",
-        sessionCount: 1,
-        sessionFocusMs: 900_000, // 15 minutes
-        _getMode: vi.fn(() => FOCUS_MODES.pomodoro),
-      },
-      { sessions: initialSessions },
-    );
-
-    mockSetData.mockClear();
+  it("Confirm commits accumulated focus time when in work phase", () => {
+    renderFocusView({
+      running: true,
+      modeKey: "pomodoro",
+      phase: "work",
+      sessionCount: 1,
+      sessionFocusMs: 900_000, // 15 minutes
+      _getMode: vi.fn(() => FOCUS_MODES.pomodoro),
+    });
 
     fireEvent.click(screen.getByText("Long session"));
     fireEvent.click(screen.getByText("Confirm"));
 
-    // mockSetData already updated mockStoreState via its implementation;
-    // check the store state directly instead of re-applying the action
-    expect(mockSetData).toHaveBeenCalled();
-    expect(mockStoreState.sessions.length).toBe(1);
-    expect(mockStoreState.sessions[0].minutes).toBe(15);
-    expect(mockStoreState.sessions[0].mode).toBe("Pomodoro");
+    // Focus persistence is delegated to the timer context so per-minute logs
+    // and the mode-switch commit are deduplicated in one place.
+    expect(mockTimer.commitFocusMinutes).toHaveBeenCalled();
   });
 
   it("dismisses popover on backdrop click", async () => {

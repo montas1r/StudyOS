@@ -150,6 +150,43 @@
   color: var(--red);
 }
 
+.b-subjects-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.b-subjects-card-edit {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  transition: color 0.12s ease;
+}
+
+.b-subjects-card-edit:hover {
+  color: var(--amber);
+}
+
+.b-subjects-rename-input {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--amber);
+  border-radius: 0;
+  padding: 3px 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  width: 100%;
+  min-width: 0;
+}
+
+.b-subjects-rename-input:focus {
+  outline: none;
+}
+
 .b-subjects-card-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

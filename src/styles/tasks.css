@@ -298,7 +298,7 @@
 .b-tasks-th-pom { width: 80px; flex-shrink: 0; text-align: center; }
 .b-tasks-th-deadline { width: 80px; flex-shrink: 0; text-align: center; }
 .b-tasks-th-status { width: 80px; flex-shrink: 0; text-align: center; }
-.b-tasks-th-actions { width: 36px; flex-shrink: 0; }
+.b-tasks-th-actions { width: 84px; flex-shrink: 0; }
 
 .b-tasks-row-group {
   border-bottom: 1px solid var(--border);
@@ -344,7 +344,7 @@
 .b-tasks-cell-pom { width: 80px; flex-shrink: 0; justify-content: center; flex-direction: column; align-items: center; gap: 2px; }
 .b-tasks-cell-deadline { width: 80px; flex-shrink: 0; justify-content: center; }
 .b-tasks-cell-status { width: 80px; flex-shrink: 0; justify-content: center; }
-.b-tasks-cell-actions { width: 36px; flex-shrink: 0; justify-content: center; }
+.b-tasks-cell-actions { width: 84px; flex-shrink: 0; justify-content: center; gap: 2px; }
 
 .b-tasks-select-all {
   width: 18px;
@@ -561,6 +561,10 @@
 
 .b-tasks-action-btn:hover {
   color: var(--red);
+}
+
+.b-tasks-action-btn-accent:hover {
+  color: var(--amber);
 }
 
 .b-tasks-empty {

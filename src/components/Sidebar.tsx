@@ -11,6 +11,7 @@ import {
   BookOpen,
   BarChart2,
   Settings,
+  CircleUser,
 } from "lucide-react";
 
 const NAV_ITEMS: { path: string; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
@@ -21,6 +22,7 @@ const NAV_ITEMS: { path: string; label: string; icon: React.ComponentType<{ size
   { path: "/goals", label: "Goals", icon: Target },
   { path: "/subjects", label: "Subjects", icon: BookOpen },
   { path: "/analytics", label: "Analytics", icon: BarChart2 },
+  { path: "/profile", label: "Profile", icon: CircleUser },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

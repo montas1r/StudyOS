@@ -130,8 +130,10 @@ export default function FocusView() {
   const today = useMemo(() => todayStr(), []);
   const todaySessions = useMemo(() => sessions.filter((s) => s.date === today), [sessions, today]);
   const completedTodayMin = useMemo(() => todaySessions.reduce((a, s) => a + s.minutes, 0), [todaySessions]);
-  const liveSessionMin = timer.phase === "work" && timer.running ? Math.floor(timer.sessionFocusMs / 60000) : 0;
-  const focusedMin = completedTodayMin + liveSessionMin;
+  // Focus minutes are persisted live into `sessions` at each minute milestone,
+  // so the store already includes the in-progress block — adding the stopwatch
+  // value on top would double count.
+  const focusedMin = completedTodayMin;
   const subject = useMemo(() => subjects.find((s) => s.id === timer.subjectId), [subjects, timer.subjectId]);
   const incompleteTasks = useMemo(() => tasks.filter((t) => t.status !== "done"), [tasks]);
 
@@ -261,23 +263,8 @@ export default function FocusView() {
   const confirmModeSwitch = useCallback(() => {
     if (pendingModeKey) {
       if (timer.phase === "work" && timer.running && timer.sessionFocusMs > 0) {
-        const elapsedMin = Math.max(1, Math.round(timer.sessionFocusMs / 60000));
-        setData((d) => ({
-          ...d,
-          sessions: [
-            ...d.sessions,
-            {
-              id: uid(),
-              date: today,
-              startTime: new Date().toISOString(),
-              subjectId: timer.subjectId,
-              minutes: elapsedMin,
-              mode: mode.label,
-              subtasksCompleted: 0,
-              distractionTags: [],
-            },
-          ],
-        }));
+        // Persist any focus accrued this block (deduped against minute-by-minute logs)
+        timer.commitFocusMinutes();
       }
       timer.setSessionCount(timer.sessionCount + (timer.phase === "work" ? 1 : 0));
       timer.pause();

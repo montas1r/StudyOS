@@ -51,8 +51,9 @@ export default function Dashboard() {
   const today = useMemo(() => todayStr(), []);
   const todaySessions = useMemo(() => sessions?.filter((s) => s.date === today) ?? [], [sessions, today]);
   const completedTodayMin = useMemo(() => todaySessions?.reduce((a, s) => a + s.minutes, 0) ?? 0, [todaySessions]);
-  const liveSessionMin = timer.phase === "work" && timer.running ? Math.floor(timer.sessionFocusMs / 60000) : 0;
-  const studyMin = completedTodayMin + liveSessionMin;
+  // Focus minutes are persisted live into `sessions` at each minute milestone,
+  // so the store already includes the in-progress block.
+  const studyMin = completedTodayMin;
   const goalMin = Number.isFinite(settings?.dailyGoalMinutes) ? settings.dailyGoalMinutes : 300;
   const tasksDone = useMemo(() => tasks?.filter((t) => t.status === "done").length ?? 0, [tasks]);
   const tasksTotal = tasks?.length ?? 0;

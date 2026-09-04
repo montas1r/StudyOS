@@ -5,6 +5,25 @@ import { defaultData } from "./utils";
 const LS_KEY = "studyos_light";
 const IDB_SESSIONS_KEY = "studyos_sessions";
 
+// ── Per-user data isolation ──
+// Storage keys are suffixed with the active user's ID so each account's study
+// data (and anonymous local data) lives in its own namespace. `null` scope
+// (signed out) reads/writes the legacy unscoped keys.
+
+let activeScope: string | null = null;
+
+export function setStorageScope(scope: string | null): void {
+  activeScope = scope;
+}
+
+export function getStorageScope(): string | null {
+  return activeScope;
+}
+
+function scopedKey(base: string): string {
+  return activeScope ? `${base}_${activeScope}` : base;
+}
+
 // ── Validators ──
 
 function sanitizeSettings(raw: Partial<Settings> | undefined): Settings {
@@ -109,7 +128,7 @@ interface LightPayload {
 function loadLight(): LightPayload | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(scopedKey(LS_KEY));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (!parsed || typeof parsed !== "object") return null;
@@ -129,7 +148,7 @@ function loadLight(): LightPayload | null {
 function saveLight(data: LightPayload): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
+    localStorage.setItem(scopedKey(LS_KEY), JSON.stringify(data));
   } catch { /* quota exceeded */ }
 }
 
@@ -137,7 +156,7 @@ function saveLight(data: LightPayload): void {
 
 async function loadSessions(): Promise<Session[]> {
   try {
-    const raw = await get<unknown>(IDB_SESSIONS_KEY);
+    const raw = await get<unknown>(scopedKey(IDB_SESSIONS_KEY));
     return sanitizeSessions(raw);
   } catch {
     return [];
@@ -146,7 +165,7 @@ async function loadSessions(): Promise<Session[]> {
 
 async function saveSessions(sessions: Session[]): Promise<void> {
   try {
-    await set(IDB_SESSIONS_KEY, sessions);
+    await set(scopedKey(IDB_SESSIONS_KEY), sessions);
   } catch { /* quota exceeded */ }
 }
 

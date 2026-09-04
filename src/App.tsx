@@ -6,6 +6,7 @@ import { applyTheme } from "@/lib/themes";
 import { resumeAudioContext } from "@/lib/audio";
 import { DragProvider } from "@/lib/DragContext";
 import { TimerProvider } from "@/lib/TimerContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import {
@@ -39,6 +40,12 @@ const AnalyticsView = lazy(() =>
 );
 const SettingsView = lazy(() =>
   import("@/components/views/SettingsView").then((m: any) => ({ default: m.SettingsView || m.Settings || m.default })),
+);
+const LoginView = lazy(() =>
+  import("@/components/views/LoginView").then((m: any) => ({ default: m.LoginView || m.Login || m.default })),
+);
+const ProfileView = lazy(() =>
+  import("@/components/views/ProfileView").then((m: any) => ({ default: m.ProfileView || m.Profile || m.default })),
 );
 
 /* ── Loading spinner ── */
@@ -122,16 +129,25 @@ export default function App() {
         <div className="studyos-root" onClick={handleShellClick}>
           <Suspense fallback={<ViewLoader />}>
             <Routes>
-              <Route element={<Layout />}>
-                <Route index element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><Dashboard /></LazyView>} />
-                <Route path="focus" element={<LazyView fallback={<ViewLoader skeleton={FocusSkeleton} />}><FocusView /></LazyView>} />
-                <Route path="tasks" element={<LazyView fallback={<ViewLoader skeleton={TasksSkeleton} />}><TasksView /></LazyView>} />
-                <Route path="habits" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><HabitsView /></LazyView>} />
-                <Route path="goals" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><GoalsView /></LazyView>} />
-                <Route path="subjects" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><SubjectsView /></LazyView>} />
-                <Route path="analytics" element={<LazyView fallback={<ViewLoader skeleton={AnalyticsSkeleton} />}><AnalyticsView /></LazyView>} />
-                <Route path="settings" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><SettingsView /></LazyView>} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+              <Route
+                path="/login"
+                element={
+                  <LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><LoginView /></LazyView>
+                }
+              />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route index element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><Dashboard /></LazyView>} />
+                  <Route path="focus" element={<LazyView fallback={<ViewLoader skeleton={FocusSkeleton} />}><FocusView /></LazyView>} />
+                  <Route path="tasks" element={<LazyView fallback={<ViewLoader skeleton={TasksSkeleton} />}><TasksView /></LazyView>} />
+                  <Route path="habits" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><HabitsView /></LazyView>} />
+                  <Route path="goals" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><GoalsView /></LazyView>} />
+                  <Route path="subjects" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><SubjectsView /></LazyView>} />
+                  <Route path="analytics" element={<LazyView fallback={<ViewLoader skeleton={AnalyticsSkeleton} />}><AnalyticsView /></LazyView>} />
+                  <Route path="settings" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><SettingsView /></LazyView>} />
+                  <Route path="profile" element={<LazyView fallback={<ViewLoader skeleton={DashboardSkeleton} />}><ProfileView /></LazyView>} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
               </Route>
             </Routes>
           </Suspense>

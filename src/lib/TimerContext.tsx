@@ -5,6 +5,8 @@ import { FOCUS_MODES, fmtClock, uid, todayStr } from "@/lib/utils";
 import { playCompletionChime, playWarningTick } from "@/lib/audio";
 import { sendCompletionNotification, requestNotificationPermission } from "@/lib/notifications";
 import { useStudyStore } from "@/lib/store";
+import { flushStorage } from "@/lib/storage";
+import type { Session } from "@/types/studyos";
 
 // ── BroadcastChannel multi-tab sync ──────────────────────────────────────────
 
@@ -182,6 +184,8 @@ export interface TimerContextValue extends TimerState {
   lap: () => void;
   resetStopwatch: () => void;
   resetSession: () => void;
+  /** Persist the current work block's focus minutes; returns total elapsed minutes. */
+  commitFocusMinutes: () => number;
   _getMode: () => { label: string; work: number; rest: number };
 }
 
@@ -238,6 +242,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const longBreakDurationRef = useRef(longBreakDuration);
   const sessionCountRef = useRef(0);
   const subjectIdRef = useRef("");
+  /** Whole focus minutes already persisted to the store for the current work block. */
+  const loggedFocusMinRef = useRef(0);
+  /** Store id of the live (in-progress) work block so accrued minutes update in place. */
+  const activeSessionIdRef = useRef<string | null>(null);
 
   // ── rAF fallback frozen+delta refs ───────────────────────────────────────────
   const stopwatchStartTimeRef = useRef<number | null>(null);
@@ -333,6 +341,73 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  // ── Minute-milestone focus logging ──────────────────────────────────────────
+  // Every full 60 seconds of focus is appended to the live work-block entry and
+  // flushed to storage immediately, so accrued focus survives pause / cancel /
+  // reset / tab close. Minutes accumulate incrementally instead of only being
+  // recorded when a session completes.
+
+  const syncMinuteProgress = useCallback(() => {
+    if (phaseRef.current !== "work") return;
+    const wholeMin = Math.floor(sessionFocusMsRef.current / 60000);
+    if (wholeMin <= loggedFocusMinRef.current) return;
+    const m = getMode();
+    const store = useStudyStore.getState();
+    const now = new Date();
+    store.setData((d) => {
+      let sessions = d.sessions;
+      if (activeSessionIdRef.current && sessions.some((s) => s.id === activeSessionIdRef.current)) {
+        // Live block already exists — bump its accrued minutes in place
+        sessions = sessions.map((s) =>
+          s.id === activeSessionIdRef.current ? { ...s, minutes: wholeMin } : s
+        );
+      } else {
+        // First milestone of a new work block → create the entry
+        const entry: Session = {
+          id: uid(),
+          date: todayStr(),
+          startTime: now.toISOString(),
+          subjectId: subjectIdRef.current,
+          minutes: wholeMin,
+          mode: m.label,
+          subtasksCompleted: 0,
+          distractionTags: [],
+        };
+        activeSessionIdRef.current = entry.id;
+        sessions = [...sessions, entry];
+      }
+      loggedFocusMinRef.current = wholeMin;
+      const next = { ...d, sessions };
+      // Persist immediately so a crash / tab close can't lose accrued focus
+      flushStorage(next);
+      return next;
+    });
+  }, [getMode]);
+
+  /**
+   * Finalize the current work block with its rounded total (used on mode-switch
+   * confirms and work-phase completion). Returns the total elapsed minutes.
+   */
+  const commitFocusMinutes = useCallback((): number => {
+    if (phaseRef.current !== "work") return 0;
+    syncMinuteProgress();
+    const elapsedMin = Math.max(1, Math.round(sessionFocusMsRef.current / 60000));
+    const delta = Math.max(0, elapsedMin - loggedFocusMinRef.current);
+    if (delta > 0 && activeSessionIdRef.current) {
+      const store = useStudyStore.getState();
+      store.setData((d) => {
+        const sessions = d.sessions.map((s) =>
+          s.id === activeSessionIdRef.current ? { ...s, minutes: elapsedMin } : s
+        );
+        const next = { ...d, sessions };
+        flushStorage(next);
+        return next;
+      });
+      loggedFocusMinRef.current = elapsedMin;
+    }
+    return elapsedMin;
+  }, [syncMinuteProgress]);
+
   // ── Leader sync interval ─────────────────────────────────────────────────────
 
   const broadcastSync = useCallback(() => {
@@ -416,6 +491,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setTotalFocusMs(tf);
         totalFocusMsRef.current = tf;
       }
+      syncMinuteProgress();
 
       // Fire completion if the target has passed
       if (rem <= 0) {
@@ -451,6 +527,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       sessionFocusMsRef.current = sessionFrozenMsRef.current + dt;
       totalFocusMsRef.current = totalFrozenMsRef.current + dt;
     }
+    syncMinuteProgress();
 
     // 3. Clear wall-clock anchors
     targetEndTimeRef.current = null;
@@ -499,26 +576,42 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     const s = store.data.settings;
 
     if (completedPhase === "work") {
-      // ── Log completed focus session to store ──
+      // ── Finalize the live focus block ──
+      // Whole minutes were already persisted minute-by-minute while the timer
+      // ran; this only writes the fractional remainder so accrued focus is never
+      // lost and nothing is double counted.
       const m = getMode();
       const elapsedMs = sessionFocusMsRef.current > 0 ? sessionFocusMsRef.current : m.work * 60000;
       const elapsedMin = Math.max(1, Math.round(elapsedMs / 60000));
-      store.setData((d) => ({
-        ...d,
-        sessions: [
-          ...d.sessions,
-          {
-            id: uid(),
-            date: todayStr(),
-            startTime: new Date().toISOString(),
-            subjectId: subjectIdRef.current,
-            minutes: elapsedMin,
-            mode: m.label,
-            subtasksCompleted: 0,
-            distractionTags: [],
-          },
-        ],
-      }));
+      const delta = Math.max(0, elapsedMin - loggedFocusMinRef.current);
+      if (delta > 0) {
+        const now = new Date();
+        store.setData((d) => {
+          let sessions = d.sessions;
+          if (activeSessionIdRef.current && sessions.some((s) => s.id === activeSessionIdRef.current)) {
+            sessions = sessions.map((s) =>
+              s.id === activeSessionIdRef.current ? { ...s, minutes: elapsedMin } : s
+            );
+          } else {
+            const entry: Session = {
+              id: uid(),
+              date: todayStr(),
+              startTime: now.toISOString(),
+              subjectId: subjectIdRef.current,
+              minutes: elapsedMin,
+              mode: m.label,
+              subtasksCompleted: 0,
+              distractionTags: [],
+            };
+            activeSessionIdRef.current = entry.id;
+            sessions = [...sessions, entry];
+          }
+          loggedFocusMinRef.current = elapsedMin;
+          const next = { ...d, sessions };
+          flushStorage(next);
+          return next;
+        });
+      }
 
       // ── Increment session count ──
       const newCount = sessionCountRef.current + 1;
@@ -597,6 +690,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // 10. Reset per-session accumulator
     setSessionFocusMs(0);
     sessionFocusMsRef.current = 0;
+    loggedFocusMinRef.current = 0;
+    activeSessionIdRef.current = null;
     if (workerRef.current) {
       try { workerRef.current.postMessage({ type: "reset-session" }); } catch { /* noop */ }
     }
@@ -818,6 +913,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
               setTotalFocusMs(msg.totalFocusMs);
               totalFocusMsRef.current = msg.totalFocusMs;
             }
+            syncMinuteProgress();
             break;
           }
           case "warn": {
@@ -862,6 +958,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
               setTotalFocusMs(msg.totalFocusMs);
               totalFocusMsRef.current = msg.totalFocusMs;
             }
+            loggedFocusMinRef.current = 0;
+            activeSessionIdRef.current = null;
             break;
           }
         }
@@ -911,6 +1009,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setTotalFocusMs(tf);
       totalFocusMsRef.current = tf;
     }
+    syncMinuteProgress();
 
     setRemaining(rem);
     remainingRef.current = rem;
@@ -963,6 +1062,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setTotalFocusMs(tf);
         totalFocusMsRef.current = tf;
       }
+      syncMinuteProgress();
 
       // Restart title-sync with the corrected targetEndTime
       if (targetEndTimeRef.current !== null) {
@@ -1077,6 +1177,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       totalFocusMsRef.current = totalFrozenMsRef.current + dt;
       setTotalFocusMs(totalFocusMsRef.current);
     }
+    syncMinuteProgress();
 
     // ④ Freeze all refs
     targetEndTimeRef.current = null;
@@ -1206,6 +1307,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       setSessionFocusMs(0);
       sessionFocusMsRef.current = 0;
       sessionFrozenMsRef.current = 0;
+      loggedFocusMinRef.current = 0;
+      activeSessionIdRef.current = null;
     }
   }, []);
 
@@ -1268,7 +1371,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     remaining, running, phase, modeKey, customWork, customRest,
     subjectId, showCustomPanel, progress,
     stopwatchElapsedMs, sessionFocusMs, totalFocusMs, sessionCount, laps,
-    start, pause, reset, lap, resetStopwatch, resetSession,
+    start, pause, reset, lap, resetStopwatch, resetSession, commitFocusMinutes,
     setModeKey: syncModeKey,
     setCustomWork: syncCustomWork,
     setCustomRest: syncCustomRest,

@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import { Flame, Plus, Trash2, Check, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flame, Plus, Trash2, Check, X, Calendar, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { todayStr, uid } from "@/lib/utils";
 import { useStudyStore } from "@/lib/store";
 
@@ -105,6 +105,8 @@ export default function HabitsView() {
   const habits = useHabits();
   const setData = useSetData();
   const [name, setName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
   const addPending = useRef(false);
   const togglePending = useRef<Set<string>>(new Set());
 
@@ -183,6 +185,21 @@ export default function HabitsView() {
     (id: string) => setData((d) => ({ ...d, habits: d.habits.filter((h) => h.id !== id) })),
     [setData],
   );
+
+  const startRenameHabit = useCallback((h: { id: string; name: string }) => {
+    setRenamingId(h.id);
+    setRenameName(h.name);
+  }, []);
+
+  const commitRenameHabit = useCallback(() => {
+    if (renamingId && renameName.trim()) {
+      setData((d) => ({
+        ...d,
+        habits: d.habits.map((h) => (h.id === renamingId ? { ...h, name: renameName.trim() } : h)),
+      }));
+    }
+    setRenamingId(null);
+  }, [renamingId, renameName, setData]);
 
   /* Completion % relative to the active range */
   const overallPct = useMemo(() => {
@@ -300,11 +317,27 @@ export default function HabitsView() {
               return (
                 <div key={h.id} className="b-habits-row">
                   <div className="b-habits-name-cell" title={h.name}>
-                    {h.name}
-                    {streak >= 3 && (
-                      <span className="b-habits-streak-badge" title={`${streak}-day streak`}>
-                        🔥{streak}
-                      </span>
+                    {renamingId === h.id ? (
+                      <input
+                        className="b-habits-rename-input"
+                        value={renameName}
+                        onChange={(e) => setRenameName(e.target.value)}
+                        onBlur={commitRenameHabit}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitRenameHabit();
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        {h.name}
+                        {streak >= 3 && (
+                          <span className="b-habits-streak-badge" title={`${streak}-day streak`}>
+                            🔥{streak}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                   {days.map((ds) => {
@@ -341,6 +374,9 @@ export default function HabitsView() {
                   </div>
                   <div className="b-habits-pct-cell">{pct}%</div>
                   <div className="b-habits-del-cell">
+                    <motion.button className="b-habits-rename-btn" onClick={() => startRenameHabit(h)} whileTap={{ scale: 0.8 }}>
+                      <Pencil size={11} />
+                    </motion.button>
                     <motion.button className="b-habits-delete-btn" onClick={() => removeHabit(h.id)} whileTap={{ scale: 0.8 }}>
                       <Trash2 size={11} />
                     </motion.button>

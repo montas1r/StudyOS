@@ -414,10 +414,12 @@
 }
 
 .b-habits-del-cell {
-  width: 36px;
-  min-width: 36px;
+  width: 48px;
+  min-width: 48px;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 2px;
   padding: 8px 0;
 }
 
@@ -435,6 +437,37 @@
 
 .b-habits-delete-btn:hover {
   color: var(--red);
+}
+
+.b-habits-rename-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  transition: color 0.12s ease;
+}
+
+.b-habits-rename-btn:hover {
+  color: var(--amber);
+}
+
+.b-habits-rename-input {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--amber);
+  border-radius: 0;
+  padding: 2px 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: "Inter", sans-serif;
+  width: 100%;
+  min-width: 0;
+}
+
+.b-habits-rename-input:focus {
+  outline: none;
 }
 
 /* ── Empty state ────────────────────────────────────────────────── */
